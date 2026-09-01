@@ -4,6 +4,7 @@ import {
   categoryLabel,
   type QuestionBankStats,
   type StatsFilters,
+  type SubjectCount,
 } from '@/services/questionStats';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -63,7 +64,7 @@ export default function AdminStats() {
   const applyFilters = () => load(filters);
 
   const clearFilters = () => {
-    const empty = { category: '', subject: '', topic: '', difficulty: '' };
+    const empty: StatsFilters = { category: '', subject: '', topic: '', difficulty: '' };
     setFilters(empty);
     load(empty);
   };
@@ -81,8 +82,8 @@ export default function AdminStats() {
     stats?.by_difficulty.find((d) => d.difficulty === name)?.count || 0;
 
   const subjectsByCategory = useMemo(() => {
-    if (!stats) return {} as Record<string, typeof stats.by_subject>;
-    const map: Record<string, typeof stats.by_subject> = {};
+    const map: Record<string, SubjectCount[]> = {};
+    if (!stats) return map;
     for (const s of stats.by_subject) {
       if (!map[s.category]) map[s.category] = [];
       map[s.category].push(s);
@@ -109,7 +110,14 @@ export default function AdminStats() {
             <select
               className="w-full h-11 rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 text-sm"
               value={filters.category || ''}
-              onChange={(e) => setFilters((f) => ({ ...f, category: e.target.value as StatsFilters['category'], subject: '', topic: '' }))}
+              onChange={(e) =>
+                setFilters((f) => ({
+                  ...f,
+                  category: e.target.value as StatsFilters['category'],
+                  subject: '',
+                  topic: '',
+                }))
+              }
             >
               <option value="">All</option>
               <option value="GENERAL_EDUCATION">General Education</option>
@@ -244,7 +252,7 @@ export default function AdminStats() {
                       {subjects.map((s) => {
                         const key = `${s.category}::${s.subject}`;
                         const open = expandedSubjects.has(key);
-                        const topics = stats.by_topic.filter(
+                        const topics = (stats?.by_topic || []).filter(
                           (t) => t.category === s.category && t.subject === s.subject
                         );
                         return (
