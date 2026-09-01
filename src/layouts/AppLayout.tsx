@@ -17,7 +17,6 @@ import {
   Home,
 } from 'lucide-react';
 import { useState } from 'react';
-import { useAuth } from '@/hooks/useAuth';
 import { signOut } from '@/services/auth';
 import { cn } from '@/lib/utils';
 
@@ -42,7 +41,6 @@ const bottomNav = [
 ];
 
 export default function AppLayout() {
-  const { profile } = useAuth();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
