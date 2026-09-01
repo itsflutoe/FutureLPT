@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { getOverallStats } from '@/services/progress';
 import { getUserAchievements } from '@/services/achievements';
 import { formatPercent } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
 import { Spinner } from '@/components/ui/Spinner';
-import { User } from 'lucide-react';
+import { User, Shield } from 'lucide-react';
 
 export default function Profile() {
   const { profile, user } = useAuth();
@@ -23,7 +25,15 @@ export default function Profile() {
       .finally(() => setLoading(false));
   }, [user]);
 
-  if (loading) return <div className="flex justify-center py-32"><Spinner /></div>;
+  if (loading) {
+    return (
+      <div className="flex justify-center py-32">
+        <Spinner />
+      </div>
+    );
+  }
+
+  const isAdmin = profile?.role === 'ADMIN';
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-8 space-y-6">
@@ -47,13 +57,66 @@ export default function Profile() {
       )}
 
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-        <Card><CardContent className="p-4"><div className="text-xs text-[var(--muted-foreground)]">Answered</div><div className="text-xl font-bold">{stats.questionsAnswered}</div></CardContent></Card>
-        <Card><CardContent className="p-4"><div className="text-xs text-[var(--muted-foreground)]">Accuracy</div><div className="text-xl font-bold">{formatPercent(stats.accuracy)}</div></CardContent></Card>
-        <Card><CardContent className="p-4"><div className="text-xs text-[var(--muted-foreground)]">Mocks</div><div className="text-xl font-bold">{stats.mockExamsCompleted}</div></CardContent></Card>
-        <Card><CardContent className="p-4"><div className="text-xs text-[var(--muted-foreground)]">Streak</div><div className="text-xl font-bold">{profile?.current_streak || 0}</div></CardContent></Card>
-        <Card><CardContent className="p-4"><div className="text-xs text-[var(--muted-foreground)]">Best Streak</div><div className="text-xl font-bold">{profile?.best_streak || 0}</div></CardContent></Card>
-        <Card><CardContent className="p-4"><div className="text-xs text-[var(--muted-foreground)]">Achievements</div><div className="text-xl font-bold">{achCount}</div></CardContent></Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-xs text-[var(--muted-foreground)]">Answered</div>
+            <div className="text-xl font-bold">{stats.questionsAnswered}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-xs text-[var(--muted-foreground)]">Accuracy</div>
+            <div className="text-xl font-bold">{formatPercent(stats.accuracy)}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-xs text-[var(--muted-foreground)]">Mocks</div>
+            <div className="text-xl font-bold">{stats.mockExamsCompleted}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-xs text-[var(--muted-foreground)]">Streak</div>
+            <div className="text-xl font-bold">{profile?.current_streak || 0}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-xs text-[var(--muted-foreground)]">Best Streak</div>
+            <div className="text-xl font-bold">{profile?.best_streak || 0}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-xs text-[var(--muted-foreground)]">Achievements</div>
+            <div className="text-xl font-bold">{achCount}</div>
+          </CardContent>
+        </Card>
       </div>
+
+      {isAdmin && (
+        <Card>
+          <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--accent-color)]/10 text-[var(--accent-color)]">
+                <Shield className="h-5 w-5" />
+              </div>
+              <div>
+                <div className="font-medium text-sm">Admin Panel</div>
+                <p className="text-xs text-[var(--muted-foreground)] mt-0.5">
+                  Manage questions, imports, and users.
+                </p>
+              </div>
+            </div>
+            <Link to="/admin">
+              <Button size="sm" className="w-full sm:w-auto">
+                Open Admin Panel
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
