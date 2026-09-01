@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase';
-import type { ExamAnswer, Question, UserTopicStat, MasteryStatus } from '@/types';
+import type { ExamAnswer, Question, UserTopicStat } from '@/types';
 import { calculateMastery } from '@/lib/utils';
 
 export async function updateStatsAfterAttempt(
@@ -120,7 +120,6 @@ export async function getMistakes(userId: string, limit = 50) {
     .select('*, question:questions(*)')
     .eq('user_id', userId)
     .gt('attempts', 0)
-    .lt('correct_count', supabase.rpc ? 999 : 999) // will filter client
     .order('last_attempted_at', { ascending: false })
     .limit(100);
 

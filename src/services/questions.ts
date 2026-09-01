@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase';
-import type { Category, Difficulty, Question, PracticeConfig } from '@/types';
+import type { Category, Difficulty, Question } from '@/types';
 
 export async function fetchQuestions(config: {
   category?: Category;
