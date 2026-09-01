@@ -25,6 +25,7 @@ import AdminDashboard from '@/pages/admin/AdminDashboard';
 import AdminQuestions from '@/pages/admin/AdminQuestions';
 import AdminImport from '@/pages/admin/AdminImport';
 import AdminUsers from '@/pages/admin/AdminUsers';
+import AdminStats from '@/pages/admin/AdminStats';
 
 export default function App() {
   return (
@@ -60,6 +61,7 @@ export default function App() {
               <Route path="/admin/questions" element={<AdminQuestions />} />
               <Route path="/admin/import" element={<AdminImport />} />
               <Route path="/admin/users" element={<AdminUsers />} />
+              <Route path="/admin/stats" element={<AdminStats />} />
             </Route>
 
             <Route path="*" element={<Navigate to="/" replace />} />
