@@ -6,4 +6,4 @@
  *
  * Leave empty until you have the real URL; the button stays disabled until set.
  */
-export const FLPT_ADMIN_FACEBOOK_URL = '';
+export const FLPT_ADMIN_FACEBOOK_URL = 'https://www.facebook.com/Fckitsflutoe';
