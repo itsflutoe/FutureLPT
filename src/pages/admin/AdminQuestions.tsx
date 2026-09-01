@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
 import { Spinner } from '@/components/ui/Spinner';
+import { Link } from 'react-router-dom';
 
 const PAGE_SIZE = 50;
 
@@ -244,10 +245,13 @@ export default function AdminQuestions() {
     <div className="mx-auto max-w-4xl px-4 py-8 space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
         <h1 className="text-2xl font-bold">Questions</h1>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <p className="text-sm text-[var(--muted-foreground)]">
             {total === 0 ? 'No questions' : `Showing ${showingFrom}–${showingTo} of ${total}`}
           </p>
+          <Link to="/admin/stats">
+            <Button size="sm" variant="outline">Statistics</Button>
+          </Link>
           <Button size="sm" onClick={openCreate}>
             Add question
           </Button>
