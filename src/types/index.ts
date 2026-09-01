@@ -144,8 +144,11 @@ export interface UserDailyActivity {
   daily_challenge_completed: boolean;
 }
 
+export type PracticeCategory = Category | 'MIXED';
+
 export interface PracticeConfig {
-  category: Category;
+  /** MIXED = General Education + Professional Education (and any active categories) */
+  category: PracticeCategory;
   subject?: string;
   topic?: string;
   count: number;
