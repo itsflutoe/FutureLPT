@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getSubjects } from '@/services/questions';
-import type { Category } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Spinner } from '@/components/ui/Spinner';
 import { GEN_ED_SUBJECTS, PROF_ED_SUBJECTS } from '@/types';

@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/Button';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { Badge } from '@/components/ui/Badge';
 import { Spinner } from '@/components/ui/Spinner';
-import { Flame, Target, BookOpen, ClipboardList, TrendingUp, ArrowRight } from 'lucide-react';
+import { Flame, Target, BookOpen, ClipboardList, ArrowRight } from 'lucide-react';
 import type { ExamAttempt, UserTopicStat } from '@/types';
 
 export default function Dashboard() {

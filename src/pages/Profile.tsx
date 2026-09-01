@@ -3,7 +3,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { getOverallStats } from '@/services/progress';
 import { getUserAchievements } from '@/services/achievements';
 import { formatPercent } from '@/lib/utils';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
+import { Card, CardContent } from '@/components/ui/Card';
 import { Spinner } from '@/components/ui/Spinner';
 import { User } from 'lucide-react';
 
