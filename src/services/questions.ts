@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase';
-import type { Category, Difficulty, Question, PracticeCategory } from '@/types';
+import type { Difficulty, Question, PracticeCategory } from '@/types';
 
 function shuffleInPlace<T>(arr: T[]): T[] {
   for (let i = arr.length - 1; i > 0; i--) {
