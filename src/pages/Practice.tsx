@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { getSubjects, getTopics, getQuestionCount } from '@/services/questions';
 import { startPractice } from '@/services/exams';
-import type { Category, Difficulty, PracticeConfig } from '@/types';
+import type { Difficulty, PracticeConfig, PracticeCategory } from '@/types';
 import { GEN_ED_SUBJECTS, PROF_ED_SUBJECTS } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -16,7 +16,7 @@ export default function Practice() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const [category, setCategory] = useState<Category>((searchParams.get('category') as Category) || 'PROFESSIONAL_EDUCATION');
+  const [category, setCategory] = useState<PracticeCategory>((searchParams.get('category') as PracticeCategory) || 'PROFESSIONAL_EDUCATION');
   const [subject, setSubject] = useState(searchParams.get('subject') || '');
   const [topic, setTopic] = useState(searchParams.get('topic') || '');
   const [count, setCount] = useState(20);
@@ -31,7 +31,11 @@ export default function Practice() {
 
   useEffect(() => {
     getSubjects(category).then(setSubjects).catch(() => setSubjects(
-      category === 'GENERAL_EDUCATION' ? [...GEN_ED_SUBJECTS] : [...PROF_ED_SUBJECTS]
+      category === 'GENERAL_EDUCATION'
+        ? [...GEN_ED_SUBJECTS]
+        : category === 'PROFESSIONAL_EDUCATION'
+          ? [...PROF_ED_SUBJECTS]
+          : [...GEN_ED_SUBJECTS, ...PROF_ED_SUBJECTS]
     ));
     setSubject('');
     setTopic('');
@@ -98,19 +102,25 @@ export default function Practice() {
           {/* Category */}
           <div>
             <label className="block text-sm font-medium mb-2">Category</label>
-            <div className="grid grid-cols-2 gap-2">
-              {(['GENERAL_EDUCATION', 'PROFESSIONAL_EDUCATION'] as Category[]).map((c) => (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              {(
+                [
+                  { id: 'GENERAL_EDUCATION' as const, label: 'General Education' },
+                  { id: 'PROFESSIONAL_EDUCATION' as const, label: 'Professional Education' },
+                  { id: 'MIXED' as const, label: 'Mixed (All)' },
+                ]
+              ).map((c) => (
                 <button
-                  key={c}
+                  key={c.id}
                   type="button"
-                  onClick={() => setCategory(c)}
+                  onClick={() => setCategory(c.id)}
                   className={`rounded-xl border px-4 py-3 text-sm font-medium transition-colors ${
-                    category === c
+                    category === c.id
                       ? 'border-[var(--accent-color)] bg-[var(--accent-color)]/10 text-[var(--accent-color)]'
                       : 'border-[var(--border)] hover:bg-[var(--muted)]'
                   }`}
                 >
-                  {c === 'GENERAL_EDUCATION' ? 'General Education' : 'Professional Education'}
+                  {c.label}
                 </button>
               ))}
             </div>
