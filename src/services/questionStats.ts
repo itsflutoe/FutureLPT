@@ -21,16 +21,6 @@ export type StatsFilters = {
   difficulty?: string;
 };
 
-function emptyStats(): QuestionBankStats {
-  return {
-    total: 0,
-    by_category: [],
-    by_subject: [],
-    by_topic: [],
-    by_difficulty: [],
-  };
-}
-
 /** Aggregate from lightweight rows (fallback if RPC is not deployed). */
 function aggregateRows(
   rows: { category: string; subject: string; topic: string; difficulty: string }[]
