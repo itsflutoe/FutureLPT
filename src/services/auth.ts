@@ -189,11 +189,11 @@ export async function signOut() {
   if (error) throw error;
 }
 
-export async function resetPassword(username: string) {
-  const { error } = await supabase.auth.resetPasswordForEmail(toAuthEmail(username), {
-    redirectTo: `${window.location.origin}/reset-password`,
-  });
-  if (error) throw friendlyAuthError(error);
+/** @deprecated Email recovery is not used. See ForgotPassword page (admin-mediated recovery). */
+export async function resetPassword(_username: string) {
+  throw new Error(
+    'Password recovery is handled by the FLPT administrator. Use Forgot Password for instructions.'
+  );
 }
 
 export async function updatePassword(newPassword: string) {
