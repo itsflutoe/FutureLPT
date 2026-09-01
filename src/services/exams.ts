@@ -16,7 +16,7 @@ export async function createAttempt(
     .insert({
       user_id: userId,
       mode: config.mode,
-      category: config.category,
+      category: config.category === 'MIXED' ? null : config.category,
       subject: config.subject || null,
       topic: config.topic || null,
       difficulty: config.difficulty,
@@ -198,6 +198,7 @@ export async function startPractice(userId: string, config: PracticeConfig) {
     topic: config.topic,
     difficulty: config.difficulty,
     limit: config.count,
+    userId,
   });
 
   if (questions.length === 0) {
