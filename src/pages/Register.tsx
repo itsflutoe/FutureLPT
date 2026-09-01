@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { signUp } from '@/services/auth';
 import { Button } from '@/components/ui/Button';
@@ -12,26 +12,33 @@ export default function Register() {
   const [targetDate, setTargetDate] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const submittingRef = useRef(false);
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submittingRef.current || loading) return;
+    submittingRef.current = true;
+
     setError('');
     if (username.length < 3) {
       setError('Username must be at least 3 characters.');
+      submittingRef.current = false;
       return;
     }
     if (password.length < 6) {
       setError('Password must be at least 6 characters.');
+      submittingRef.current = false;
       return;
     }
+
     setLoading(true);
     try {
       await signUp(username, password, displayName || username, targetDate || undefined);
-      navigate('/dashboard');
+      navigate('/dashboard', { replace: true });
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Registration failed.');
-    } finally {
+      submittingRef.current = false;
       setLoading(false);
     }
   };
@@ -41,11 +48,15 @@ export default function Register() {
       <Card className="w-full max-w-md">
         <CardHeader>
           <div className="flex items-center gap-2 mb-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--accent-color)] text-white font-bold text-sm">FL</div>
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--accent-color)] text-white font-bold text-sm">
+              FL
+            </div>
             <span className="font-semibold">FLPT</span>
           </div>
           <CardTitle>Create your account</CardTitle>
-          <p className="text-sm text-[var(--muted-foreground)]">Start preparing for the LET with a personal companion.</p>
+          <p className="text-sm text-[var(--muted-foreground)]">
+            Start preparing for the LET with a personal companion.
+          </p>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -55,20 +66,57 @@ export default function Register() {
               </div>
             )}
             <div>
-              <label htmlFor="username" className="block text-sm font-medium mb-1.5">Username *</label>
-              <Input id="username" value={username} onChange={(e) => setUsername(e.target.value)} required autoComplete="username" placeholder="unique username" />
+              <label htmlFor="username" className="block text-sm font-medium mb-1.5">
+                Username *
+              </label>
+              <Input
+                id="username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                required
+                autoComplete="username"
+                placeholder="unique username"
+                disabled={loading}
+              />
             </div>
             <div>
-              <label htmlFor="displayName" className="block text-sm font-medium mb-1.5">Display name</label>
-              <Input id="displayName" value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="How we should greet you" />
+              <label htmlFor="displayName" className="block text-sm font-medium mb-1.5">
+                Display name
+              </label>
+              <Input
+                id="displayName"
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                placeholder="How we should greet you"
+                disabled={loading}
+              />
             </div>
             <div>
-              <label htmlFor="password" className="block text-sm font-medium mb-1.5">Password *</label>
-              <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="new-password" minLength={6} />
+              <label htmlFor="password" className="block text-sm font-medium mb-1.5">
+                Password *
+              </label>
+              <Input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                autoComplete="new-password"
+                minLength={6}
+                disabled={loading}
+              />
             </div>
             <div>
-              <label htmlFor="targetDate" className="block text-sm font-medium mb-1.5">Target LET date (optional)</label>
-              <Input id="targetDate" type="date" value={targetDate} onChange={(e) => setTargetDate(e.target.value)} />
+              <label htmlFor="targetDate" className="block text-sm font-medium mb-1.5">
+                Target LET date (optional)
+              </label>
+              <Input
+                id="targetDate"
+                type="date"
+                value={targetDate}
+                onChange={(e) => setTargetDate(e.target.value)}
+                disabled={loading}
+              />
             </div>
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? 'Creating account…' : 'Create Account'}
@@ -76,7 +124,9 @@ export default function Register() {
           </form>
           <p className="mt-6 text-center text-sm text-[var(--muted-foreground)]">
             Already have an account?{' '}
-            <Link to="/login" className="text-[var(--accent-color)] font-medium hover:underline">Log in</Link>
+            <Link to="/login" className="text-[var(--accent-color)] font-medium hover:underline">
+              Log in
+            </Link>
           </p>
           <p className="mt-4 text-xs text-center text-[var(--muted-foreground)]">
             FLPT is not affiliated with PRC or CHED. Practice material is LET-style only.
