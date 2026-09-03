@@ -60,6 +60,35 @@ function fromQuestion(q: Question): QuestionForm {
   };
 }
 
+
+function csvEscape(value: string | null | undefined): string {
+  const s = value ?? '';
+  if (/[",\n\r]/.test(s)) {
+    return `"${s.replace(/"/g, '""')}"`;
+  }
+  return s;
+}
+
+async function fetchAllQuestionsForAdmin(): Promise<Question[]> {
+  const pageSize = 1000;
+  let from = 0;
+  const all: Question[] = [];
+  for (;;) {
+    const { data, error } = await supabase
+      .from('questions')
+      .select('*')
+      .order('created_at', { ascending: true })
+      .range(from, from + pageSize - 1);
+    if (error) throw error;
+    const batch = (data || []) as Question[];
+    if (batch.length === 0) break;
+    all.push(...batch);
+    if (batch.length < pageSize) break;
+    from += pageSize;
+  }
+  return all;
+}
+
 export default function AdminQuestions() {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [total, setTotal] = useState(0);
@@ -75,6 +104,8 @@ export default function AdminQuestions() {
   const [form, setForm] = useState<QuestionForm>(emptyForm());
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
+  const [deletingAll, setDeletingAll] = useState(false);
 
   const load = async (pageIndex: number, query: string) => {
     setLoading(true);
@@ -220,6 +251,102 @@ export default function AdminQuestions() {
     }
   };
 
+
+  const exportAll = async () => {
+    setExporting(true);
+    setError('');
+    setStatus('');
+    try {
+      const all = await fetchAllQuestionsForAdmin();
+      if (all.length === 0) {
+        setStatus('No questions to export.');
+        return;
+      }
+      const header = [
+        'Category',
+        'Subject',
+        'Topic',
+        'Difficulty',
+        'Question',
+        'A',
+        'B',
+        'C',
+        'D',
+        'Correct Answer',
+        'Rationale',
+        'Reference',
+      ];
+      const lines = [header.join(',')];
+      for (const q of all) {
+        lines.push(
+          [
+            csvEscape(q.category),
+            csvEscape(q.subject),
+            csvEscape(q.topic),
+            csvEscape(q.difficulty),
+            csvEscape(q.question),
+            csvEscape(q.option_a),
+            csvEscape(q.option_b),
+            csvEscape(q.option_c),
+            csvEscape(q.option_d),
+            csvEscape(q.correct_answer),
+            csvEscape(q.explanation),
+            csvEscape(q.reference),
+          ].join(',')
+        );
+      }
+      const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `flpt-questions-${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      setStatus(`Exported ${all.length} questions.`);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Export failed');
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const deleteAllQuestions = async () => {
+    const ok = window.confirm(
+      'Delete ALL questions permanently?\n\nThis removes the entire question bank. Related attempt answers may be removed by cascade. This cannot be undone.'
+    );
+    if (!ok) return;
+    const ok2 = window.confirm(
+      `Type-confirm: really delete all ${total} questions from the database?`
+    );
+    if (!ok2) return;
+
+    setDeletingAll(true);
+    setError('');
+    setStatus('');
+    try {
+      // Batch delete by id to stay within API limits and RLS-friendly operations
+      const all = await fetchAllQuestionsForAdmin();
+      const ids = all.map((q) => q.id);
+      const chunkSize = 100;
+      let deleted = 0;
+      for (let i = 0; i < ids.length; i += chunkSize) {
+        const chunk = ids.slice(i, i + chunkSize);
+        const { error: delError } = await supabase.from('questions').delete().in('id', chunk);
+        if (delError) throw delError;
+        deleted += chunk.length;
+      }
+      setStatus(`Deleted ${deleted} questions.`);
+      closeForm();
+      await load(0, '');
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Delete all failed');
+    } finally {
+      setDeletingAll(false);
+    }
+  };
+
   const toggleActive = async (id: string, active: boolean) => {
     const { error: updError } = await supabase
       .from('questions')
@@ -252,6 +379,17 @@ export default function AdminQuestions() {
           <Link to="/admin/stats">
             <Button size="sm" variant="outline">Statistics</Button>
           </Link>
+          <Button size="sm" variant="outline" onClick={exportAll} disabled={exporting || total === 0}>
+            {exporting ? 'Exporting…' : 'Export all'}
+          </Button>
+          <Button
+            size="sm"
+            variant="danger"
+            onClick={deleteAllQuestions}
+            disabled={deletingAll || total === 0}
+          >
+            {deletingAll ? 'Deleting…' : 'Delete all'}
+          </Button>
           <Button size="sm" onClick={openCreate}>
             Add question
           </Button>
