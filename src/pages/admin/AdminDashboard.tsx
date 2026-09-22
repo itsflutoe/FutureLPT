@@ -6,6 +6,20 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Spinner } from '@/components/ui/Spinner';
 import { ProgressBar } from '@/components/ui/ProgressBar';
+import {
+  BarChart3,
+  BookOpen,
+  Upload,
+  Users,
+  ChevronRight,
+} from 'lucide-react';
+
+const adminLinks = [
+  { to: '/admin/stats', label: 'Question Bank Statistics', desc: 'Counts by category & topic', icon: BarChart3 },
+  { to: '/admin/questions', label: 'Manage Questions', desc: 'Search, edit, export, delete', icon: BookOpen },
+  { to: '/admin/import', label: 'CSV Import', desc: 'Bulk upload questions', icon: Upload },
+  { to: '/admin/users', label: 'Users', desc: 'Profiles & password reset', icon: Users },
+];
 
 export default function AdminDashboard() {
   const [counts, setCounts] = useState({ questions: 0, users: 0, attempts: 0 });
@@ -42,78 +56,83 @@ export default function AdminDashboard() {
   const diff = (name: string) => byDifficulty.find((d) => d.difficulty === name)?.count || 0;
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-8 space-y-6">
-      <h1 className="text-2xl font-bold">Admin Dashboard</h1>
+    <div className="mx-auto max-w-4xl px-4 py-6 sm:py-8 space-y-6">
+      <h1 className="text-2xl font-bold">Admin</h1>
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-3 gap-3">
         <Card>
-          <CardContent className="p-4">
-            <div className="text-xs text-[var(--muted-foreground)]">Questions</div>
-            <div className="text-2xl font-bold">{counts.questions}</div>
+          <CardContent className="p-3 sm:p-4">
+            <div className="text-[10px] sm:text-xs text-[var(--muted-foreground)]">Questions</div>
+            <div className="text-xl sm:text-2xl font-bold">{counts.questions}</div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-4">
-            <div className="text-xs text-[var(--muted-foreground)]">Users</div>
-            <div className="text-2xl font-bold">{counts.users}</div>
+          <CardContent className="p-3 sm:p-4">
+            <div className="text-[10px] sm:text-xs text-[var(--muted-foreground)]">Users</div>
+            <div className="text-xl sm:text-2xl font-bold">{counts.users}</div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-4">
-            <div className="text-xs text-[var(--muted-foreground)]">Attempts</div>
-            <div className="text-2xl font-bold">{counts.attempts}</div>
+          <CardContent className="p-3 sm:p-4">
+            <div className="text-[10px] sm:text-xs text-[var(--muted-foreground)]">Attempts</div>
+            <div className="text-xl sm:text-2xl font-bold">{counts.attempts}</div>
           </CardContent>
         </Card>
       </div>
 
+      {/* Mobile-friendly nav cards */}
+      <div className="grid gap-2 sm:grid-cols-2">
+        {adminLinks.map((item) => (
+          <Link
+            key={item.to}
+            to={item.to}
+            className="flex items-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--card)] p-3 hover:bg-[var(--muted)]/40 transition-colors"
+          >
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--muted)] shrink-0">
+              <item.icon className="h-5 w-5 text-[var(--accent-color)]" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="font-medium text-sm">{item.label}</div>
+              <div className="text-xs text-[var(--muted-foreground)]">{item.desc}</div>
+            </div>
+            <ChevronRight className="h-4 w-4 text-[var(--muted-foreground)] shrink-0" />
+          </Link>
+        ))}
+      </div>
+
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="text-base">Question bank overview</CardTitle>
+        <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <CardTitle className="text-base">Question bank</CardTitle>
           <Link to="/admin/stats" className="text-sm text-[var(--accent-color)] hover:underline">
-            Full statistics
+            Full stats
           </Link>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-3 gap-3 text-center">
-            <div className="rounded-xl border border-[var(--border)] p-3">
-              <div className="text-xs text-[var(--muted-foreground)]">Easy</div>
-              <div className="text-xl font-bold">{diff('EASY')}</div>
+          <div className="grid grid-cols-3 gap-2 text-center">
+            <div className="rounded-xl border border-[var(--border)] p-2.5">
+              <div className="text-[10px] sm:text-xs text-[var(--muted-foreground)]">Easy</div>
+              <div className="text-lg sm:text-xl font-bold">{diff('EASY')}</div>
             </div>
-            <div className="rounded-xl border border-[var(--border)] p-3">
-              <div className="text-xs text-[var(--muted-foreground)]">Moderate</div>
-              <div className="text-xl font-bold">{diff('MODERATE')}</div>
+            <div className="rounded-xl border border-[var(--border)] p-2.5">
+              <div className="text-[10px] sm:text-xs text-[var(--muted-foreground)]">Moderate</div>
+              <div className="text-lg sm:text-xl font-bold">{diff('MODERATE')}</div>
             </div>
-            <div className="rounded-xl border border-[var(--border)] p-3">
-              <div className="text-xs text-[var(--muted-foreground)]">Difficult</div>
-              <div className="text-xl font-bold">{diff('DIFFICULT')}</div>
+            <div className="rounded-xl border border-[var(--border)] p-2.5">
+              <div className="text-[10px] sm:text-xs text-[var(--muted-foreground)]">Difficult</div>
+              <div className="text-lg sm:text-xl font-bold">{diff('DIFFICULT')}</div>
             </div>
           </div>
           {byCategory.map((c) => (
             <div key={c.category}>
               <div className="flex justify-between text-sm mb-1">
-                <span>{categoryLabel(c.category)}</span>
-                <span className="font-semibold">{c.count}</span>
+                <span className="truncate pr-2">{categoryLabel(c.category)}</span>
+                <span className="font-semibold shrink-0">{c.count}</span>
               </div>
               <ProgressBar value={total ? (c.count / total) * 100 : 0} />
             </div>
           ))}
         </CardContent>
       </Card>
-
-      <div className="flex flex-wrap gap-3">
-        <Link to="/admin/stats">
-          <Button>Question Bank Statistics</Button>
-        </Link>
-        <Link to="/admin/questions">
-          <Button variant="outline">Manage Questions</Button>
-        </Link>
-        <Link to="/admin/import">
-          <Button variant="outline">CSV Import</Button>
-        </Link>
-        <Link to="/admin/users">
-          <Button variant="outline">Users</Button>
-        </Link>
-      </div>
     </div>
   );
 }

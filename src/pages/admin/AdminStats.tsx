@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
   getQuestionBankStats,
   categoryLabel,
@@ -92,16 +93,21 @@ export default function AdminStats() {
   }, [stats]);
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-8 space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Question Bank Statistics</h1>
-        <p className="text-sm text-[var(--muted-foreground)] mt-1">
-          Live counts from the Supabase question bank (active questions only).
-        </p>
+    <div className="mx-auto max-w-5xl px-4 py-6 sm:py-8 space-y-6">
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <h1 className="text-2xl font-bold">Question Bank Statistics</h1>
+          <p className="text-sm text-[var(--muted-foreground)] mt-1">
+            Live counts from Supabase (active questions only).
+          </p>
+        </div>
+        <Link to="/admin" className="text-sm text-[var(--accent-color)] hover:underline shrink-0">
+          Admin
+        </Link>
       </div>
 
       <Card>
-        <CardHeader>
+        <CardHeader className="pb-2">
           <CardTitle className="text-base">Filters</CardTitle>
         </CardHeader>
         <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -168,9 +174,11 @@ export default function AdminStats() {
               <option value="DIFFICULT">Difficult</option>
             </select>
           </div>
-          <div className="sm:col-span-2 lg:col-span-4 flex gap-2">
-            <Button onClick={applyFilters}>Apply filters</Button>
-            <Button variant="outline" onClick={clearFilters}>
+          <div className="sm:col-span-2 lg:col-span-4 flex flex-col sm:flex-row gap-2">
+            <Button className="w-full sm:w-auto" onClick={applyFilters}>
+              Apply filters
+            </Button>
+            <Button className="w-full sm:w-auto" variant="outline" onClick={clearFilters}>
               Clear
             </Button>
           </div>
@@ -189,29 +197,29 @@ export default function AdminStats() {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <Card>
-              <CardContent className="p-4">
-                <div className="text-xs text-[var(--muted-foreground)]">Total questions</div>
-                <div className="text-3xl font-bold mt-1">{stats.total}</div>
+              <CardContent className="p-3 sm:p-4">
+                <div className="text-[10px] sm:text-xs text-[var(--muted-foreground)]">Total</div>
+                <div className="text-2xl sm:text-3xl font-bold mt-0.5">{stats.total}</div>
               </CardContent>
             </Card>
             <Card>
-              <CardContent className="p-4">
-                <div className="text-xs text-[var(--muted-foreground)]">Easy</div>
-                <div className="text-3xl font-bold mt-1">{difficultyCount('EASY')}</div>
+              <CardContent className="p-3 sm:p-4">
+                <div className="text-[10px] sm:text-xs text-[var(--muted-foreground)]">Easy</div>
+                <div className="text-2xl sm:text-3xl font-bold mt-0.5">{difficultyCount('EASY')}</div>
               </CardContent>
             </Card>
             <Card>
-              <CardContent className="p-4">
-                <div className="text-xs text-[var(--muted-foreground)]">Moderate</div>
-                <div className="text-3xl font-bold mt-1">{difficultyCount('MODERATE')}</div>
+              <CardContent className="p-3 sm:p-4">
+                <div className="text-[10px] sm:text-xs text-[var(--muted-foreground)]">Moderate</div>
+                <div className="text-2xl sm:text-3xl font-bold mt-0.5">{difficultyCount('MODERATE')}</div>
               </CardContent>
             </Card>
             <Card>
-              <CardContent className="p-4">
-                <div className="text-xs text-[var(--muted-foreground)]">Difficult</div>
-                <div className="text-3xl font-bold mt-1">{difficultyCount('DIFFICULT')}</div>
+              <CardContent className="p-3 sm:p-4">
+                <div className="text-[10px] sm:text-xs text-[var(--muted-foreground)]">Difficult</div>
+                <div className="text-2xl sm:text-3xl font-bold mt-0.5">{difficultyCount('DIFFICULT')}</div>
               </CardContent>
             </Card>
           </div>
@@ -259,16 +267,16 @@ export default function AdminStats() {
                           <div key={key} className="rounded-xl border border-[var(--border)]">
                             <button
                               type="button"
-                              className="w-full flex items-center justify-between px-3 py-2.5 text-sm text-left hover:bg-[var(--muted)]/40"
+                              className="w-full flex items-center justify-between gap-2 px-3 py-3 text-sm text-left hover:bg-[var(--muted)]/40 min-h-11"
                               onClick={() => toggleSubject(key)}
                             >
-                              <span>
+                              <span className="min-w-0 truncate">
                                 {s.subject}
                                 <span className="text-[var(--muted-foreground)] text-xs ml-2">
-                                  {open ? 'Hide topics' : 'Show topics'}
+                                  {open ? 'Hide' : 'Topics'}
                                 </span>
                               </span>
-                              <span className="font-semibold">{s.count}</span>
+                              <span className="font-semibold shrink-0">{s.count}</span>
                             </button>
                             {open && (
                               <div className="border-t border-[var(--border)] px-3 py-2 space-y-1 bg-[var(--muted)]/20">
@@ -278,10 +286,10 @@ export default function AdminStats() {
                                   topics.map((t) => (
                                     <div
                                       key={`${t.topic}`}
-                                      className="flex justify-between text-xs sm:text-sm py-0.5"
+                                      className="flex justify-between text-xs sm:text-sm py-1 gap-2"
                                     >
-                                      <span className="text-[var(--muted-foreground)]">{t.topic}</span>
-                                      <span className="font-medium">{t.count}</span>
+                                      <span className="text-[var(--muted-foreground)] truncate">{t.topic}</span>
+                                      <span className="font-medium shrink-0">{t.count}</span>
                                     </div>
                                   ))
                                 )}

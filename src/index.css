@@ -18,6 +18,8 @@
   --success: #16a34a;
   --error: #dc2626;
   --warning: #f59e0b;
+  --radius: 0.75rem;
+  --space-page: 1rem;
 }
 
 .dark {
@@ -32,6 +34,12 @@
 
 * {
   border-color: var(--border);
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 body {
@@ -40,6 +48,16 @@ body {
   font-family: var(--font-sans);
   margin: 0;
   min-height: 100vh;
+  min-height: 100dvh;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Touch-friendly defaults */
+button,
+[role='button'],
+a {
+  -webkit-tap-highlight-color: transparent;
 }
 
 /* Focus styles for accessibility */
@@ -48,15 +66,38 @@ body {
   outline-offset: 2px;
 }
 
-/* Custom scrollbar */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+/* Reduce motion preference */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
-::-webkit-scrollbar-track {
-  background: var(--muted);
+
+/* Hide horizontal scrollbar on chip rows while keeping scroll */
+.scrollbar-none {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
-::-webkit-scrollbar-thumb {
-  background: var(--muted-foreground);
-  border-radius: 4px;
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+/* Custom scrollbar (desktop) */
+@media (min-width: 1024px) {
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: var(--muted);
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--muted-foreground);
+    border-radius: 4px;
+  }
 }

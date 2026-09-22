@@ -16,9 +16,9 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       danger: 'bg-red-600 text-white hover:bg-red-700',
     };
     const sizes = {
-      sm: 'px-3 py-1.5 text-sm rounded-lg',
-      md: 'px-4 py-2 text-sm rounded-xl',
-      lg: 'px-6 py-3 text-base rounded-xl',
+      sm: 'min-h-9 px-3 py-1.5 text-sm rounded-lg',
+      md: 'min-h-11 px-4 py-2 text-sm rounded-xl',
+      lg: 'min-h-12 px-6 py-3 text-base rounded-xl',
     };
 
     return (

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -39,11 +40,10 @@ function normalizeHeader(h: string): string {
   return h
     .trim()
     .toLowerCase()
-    .replace(/^\uFEFF/, '') // BOM
+    .replace(/^\uFEFF/, '')
     .replace(/[\s\-]+/g, '_');
 }
 
-/** Map common header aliases to canonical keys used by the importer. */
 function canonicalKey(h: string): string {
   const n = normalizeHeader(h);
   const aliases: Record<string, string> = {
@@ -79,13 +79,11 @@ function canonicalKey(h: string): string {
 }
 
 function parseCSV(text: string): Record<string, string>[] {
-  // Normalize newlines; keep non-empty lines
   const rawLines = text.replace(/^\uFEFF/, '').split(/\r?\n/);
   const lines: string[] = [];
   let buf = '';
   let inQuotes = false;
 
-  // Re-join rows that span multiple lines because of quoted newlines
   for (const line of rawLines) {
     buf = buf ? `${buf}\n${line}` : line;
     const quotes = (buf.match(/"/g) || []).length;
@@ -182,7 +180,6 @@ export default function AdminImport() {
         is_active: true,
       }));
 
-      // Insert in chunks to avoid payload limits
       const chunkSize = 50;
       let inserted = 0;
       for (let i = 0; i < payload.length; i += chunkSize) {
@@ -204,19 +201,30 @@ export default function AdminImport() {
     }
   };
 
+  const canImport = !!file && errors.length === 0 && parsedRows.length > 0 && !importing;
+
   return (
-    <div className="mx-auto max-w-3xl px-4 py-8 space-y-6">
-      <h1 className="text-2xl font-bold">CSV Import</h1>
+    <div className="mx-auto max-w-3xl px-4 py-6 sm:py-8 space-y-6 pb-28 sm:pb-8">
+      <div className="flex items-center justify-between gap-2">
+        <h1 className="text-2xl font-bold">CSV Import</h1>
+        <Link to="/admin/questions" className="text-sm text-[var(--accent-color)] hover:underline">
+          Manage questions
+        </Link>
+      </div>
+
       <div className="text-sm text-[var(--muted-foreground)] space-y-1">
         <p>
           Required columns:{' '}
-          <code className="text-xs">Category, Subject, Topic, Difficulty, Question, A, B, C, D, Correct Answer, Rationale, Reference</code>
+          <code className="text-xs break-all">
+            Category, Subject, Topic, Difficulty, Question, A, B, C, D, Correct Answer, Rationale,
+            Reference
+          </code>
         </p>
         <p>
-          Use UTF-8 CSV. Put quotes around fields that contain commas. Correct Answer must be{' '}
-          <strong>A</strong>, <strong>B</strong>, <strong>C</strong>, or <strong>D</strong>.
+          UTF-8 CSV. Quote fields with commas. Correct Answer must be <strong>A–D</strong>.
         </p>
       </div>
+
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Upload CSV</CardTitle>
@@ -226,8 +234,13 @@ export default function AdminImport() {
             type="file"
             accept=".csv,text/csv"
             onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
-            className="text-sm"
+            className="block w-full text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-[var(--muted)] file:px-3 file:py-2 file:text-sm"
           />
+          {file && (
+            <p className="text-xs text-[var(--muted-foreground)]">
+              {file.name} · {parsedRows.length} rows parsed
+            </p>
+          )}
           {errors.length > 0 && (
             <div className="rounded-xl bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 px-4 py-3 text-sm max-h-48 overflow-y-auto">
               {errors.slice(0, 30).map((e, i) => (
@@ -238,18 +251,32 @@ export default function AdminImport() {
           )}
           {preview.length > 0 && errors.length === 0 && (
             <div>
-              <p className="text-sm font-medium mb-2">Preview (first 5 rows) — looks good</p>
+              <p className="text-sm font-medium mb-2">Preview (first 5 rows)</p>
               <pre className="text-xs bg-[var(--muted)] p-3 rounded-xl overflow-x-auto max-h-48">
                 {JSON.stringify(preview, null, 2)}
               </pre>
             </div>
           )}
           {status && <p className="text-sm">{status}</p>}
-          <Button onClick={doImport} disabled={!file || errors.length > 0 || importing || parsedRows.length === 0}>
-            {importing ? 'Importing…' : `Confirm Import${parsedRows.length ? ` (${parsedRows.length})` : ''}`}
-          </Button>
+
+          {/* Desktop confirm */}
+          <div className="hidden sm:block">
+            <Button onClick={doImport} disabled={!canImport}>
+              {importing ? 'Importing…' : `Confirm Import${parsedRows.length ? ` (${parsedRows.length})` : ''}`}
+            </Button>
+          </div>
         </CardContent>
       </Card>
+
+      {/* Sticky mobile import action */}
+      <div
+        className="sm:hidden fixed bottom-0 inset-x-0 z-20 border-t border-[var(--border)] bg-[var(--card)]/95 backdrop-blur p-3"
+        style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
+      >
+        <Button className="w-full" onClick={doImport} disabled={!canImport}>
+          {importing ? 'Importing…' : `Import${parsedRows.length ? ` ${parsedRows.length} questions` : ''}`}
+        </Button>
+      </div>
     </div>
   );
 }
