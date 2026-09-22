@@ -161,7 +161,9 @@ export default function Exam() {
   return (
     <div className="mx-auto max-w-3xl px-4 py-6 min-h-screen flex flex-col">
       <div className="flex items-center justify-between mb-4 sticky top-0 bg-[var(--background)] z-10 py-2">
-        <div className="text-sm font-medium">Question {current + 1} / {questions.length}</div>
+        <div className="text-sm font-medium">
+          Question {current + 1} / {questions.length}
+        </div>
         {timeLeft !== null && !isPractice && (
           <div className={`font-mono text-sm font-semibold ${timeLeft < 300 ? 'text-red-600' : ''}`}>
             {formatDuration(timeLeft)}
@@ -178,7 +180,10 @@ export default function Exam() {
       </div>
 
       <div className="h-1.5 w-full bg-[var(--muted)] rounded-full mb-6">
-        <div className="h-full bg-[var(--accent-color)] rounded-full transition-all" style={{ width: `${((current + 1) / questions.length) * 100}%` }} />
+        <div
+          className="h-full bg-[var(--accent-color)] rounded-full transition-all"
+          style={{ width: `${((current + 1) / questions.length) * 100}%` }}
+        />
       </div>
 
       <div className="flex-1">
@@ -190,16 +195,24 @@ export default function Exam() {
 
         <div className="space-y-3">
           {options.map((opt) => {
-            let style = 'border-[var(--border)] hover:border-[var(--accent-color)]/50';
+            let style =
+              'border-[var(--border)] text-[var(--foreground)] hover:border-[var(--accent-color)]/50';
+
             if (selected === opt.key) {
               if (isPractice && showFeedback) {
-                style = opt.key === q.correct_answer ? 'border-green-500 bg-green-50 dark:bg-green-900/20' : 'border-red-500 bg-red-50 dark:bg-red-900/20';
+                style =
+                  opt.key === q.correct_answer
+                    ? 'border-green-600 bg-green-100 text-green-950 dark:bg-green-950 dark:text-green-50 dark:border-green-500'
+                    : 'border-red-600 bg-red-100 text-red-950 dark:bg-red-950 dark:text-red-50 dark:border-red-500';
               } else {
-                style = 'border-[var(--accent-color)] bg-[var(--accent-color)]/10';
+                style =
+                  'border-[var(--accent-color)] bg-[var(--accent-color)]/10 text-[var(--foreground)]';
               }
             } else if (isPractice && showFeedback && opt.key === q.correct_answer) {
-              style = 'border-green-500 bg-green-50 dark:bg-green-900/20';
+              style =
+                'border-green-600 bg-green-100 text-green-950 dark:bg-green-950 dark:text-green-50 dark:border-green-500';
             }
+
             return (
               <button
                 key={opt.key}
@@ -210,8 +223,15 @@ export default function Exam() {
               >
                 <span className="font-semibold shrink-0 w-6">{opt.key}.</span>
                 <span className="flex-1">{opt.text}</span>
-                {isPractice && showFeedback && opt.key === q.correct_answer && <Check className="h-5 w-5 text-green-600 shrink-0" />}
-                {isPractice && showFeedback && selected === opt.key && opt.key !== q.correct_answer && <X className="h-5 w-5 text-red-600 shrink-0" />}
+                {isPractice && showFeedback && opt.key === q.correct_answer && (
+                  <Check className="h-5 w-5 text-green-700 dark:text-green-300 shrink-0" />
+                )}
+                {isPractice &&
+                  showFeedback &&
+                  selected === opt.key &&
+                  opt.key !== q.correct_answer && (
+                    <X className="h-5 w-5 text-red-700 dark:text-red-300 shrink-0" />
+                  )}
               </button>
             );
           })}
@@ -220,11 +240,19 @@ export default function Exam() {
         {isPractice && showFeedback && (
           <div className="mt-6 rounded-xl border border-[var(--border)] bg-[var(--muted)]/30 p-4">
             <div className="flex items-center gap-2 mb-2">
-              {selected === q.correct_answer ? <Badge variant="success">Correct</Badge> : <Badge variant="error">Incorrect</Badge>}
-              <span className="text-sm">Correct answer: <strong>{q.correct_answer}</strong></span>
+              {selected === q.correct_answer ? (
+                <Badge variant="success">Correct</Badge>
+              ) : (
+                <Badge variant="error">Incorrect</Badge>
+              )}
+              <span className="text-sm">
+                Correct answer: <strong>{q.correct_answer}</strong>
+              </span>
             </div>
-            <p className="text-sm leading-relaxed">{q.explanation}</p>
-            {q.reference && <p className="text-xs text-[var(--muted-foreground)] mt-2">Reference: {q.reference}</p>}
+            <p className="text-sm leading-relaxed text-[var(--foreground)]">{q.explanation}</p>
+            {q.reference && (
+              <p className="text-xs text-[var(--muted-foreground)] mt-2">Reference: {q.reference}</p>
+            )}
           </div>
         )}
       </div>
@@ -239,14 +267,24 @@ export default function Exam() {
             else if (ans?.selected_answer) cls = 'bg-[var(--accent-color)]/20 text-[var(--accent-color)]';
             if (isFlag) cls += ' ring-2 ring-amber-400';
             return (
-              <button key={qq.id} type="button" onClick={() => setCurrent(i)} className={`h-8 w-8 rounded-lg text-xs font-medium ${cls}`}>
+              <button
+                key={qq.id}
+                type="button"
+                onClick={() => setCurrent(i)}
+                className={`h-8 w-8 rounded-lg text-xs font-medium ${cls}`}
+              >
                 {i + 1}
               </button>
             );
           })}
         </div>
         <div className="flex items-center justify-between gap-3">
-          <Button variant="outline" onClick={() => setCurrent((c) => Math.max(0, c - 1))} disabled={current === 0} className="gap-1">
+          <Button
+            variant="outline"
+            onClick={() => setCurrent((c) => Math.max(0, c - 1))}
+            disabled={current === 0}
+            className="gap-1"
+          >
             <ChevronLeft className="h-4 w-4" /> Prev
           </Button>
           {current < questions.length - 1 ? (
