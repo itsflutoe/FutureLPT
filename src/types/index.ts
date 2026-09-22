@@ -154,6 +154,8 @@ export interface PracticeConfig {
   count: number;
   difficulty: Difficulty | 'MIXED';
   mode: ExamMode;
+  /** Marks attempt as today's Daily LET Challenge */
+  isDailyChallenge?: boolean;
 }
 
 export interface ExamResultSummary {
@@ -190,3 +192,6 @@ export const ACCENT_COLORS: Record<AccentColor, string> = {
   purple: '#7c3aed',
   orange: '#ea580c',
 };
+
+/** Fixed size for the Daily LET Challenge */
+export const DAILY_CHALLENGE_COUNT = 10;

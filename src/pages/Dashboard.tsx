@@ -1,39 +1,52 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { getOverallStats, getRecommendations, getSubjectPerformance } from '@/services/progress';
-import { getUserHistory } from '@/services/exams';
+import { getUserHistory, hasCompletedDailyChallengeToday } from '@/services/exams';
 import { getGreeting, formatPercent } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { Badge } from '@/components/ui/Badge';
 import { Spinner } from '@/components/ui/Spinner';
-import { Flame, Target, BookOpen, ClipboardList, ArrowRight } from 'lucide-react';
+import { Flame, Target, BookOpen, ClipboardList, ArrowRight, CheckCircle2, Zap } from 'lucide-react';
 import type { ExamAttempt, UserTopicStat } from '@/types';
+import { DAILY_CHALLENGE_COUNT } from '@/types';
 
 export default function Dashboard() {
   const { user, profile } = useAuth();
-  const [stats, setStats] = useState({ questionsAnswered: 0, correctAnswers: 0, accuracy: 0, mockExamsCompleted: 0, practiceSessions: 0 });
+  const navigate = useNavigate();
+  const [stats, setStats] = useState({
+    questionsAnswered: 0,
+    correctAnswers: 0,
+    accuracy: 0,
+    mockExamsCompleted: 0,
+    practiceSessions: 0,
+  });
   const [recs, setRecs] = useState<UserTopicStat[]>([]);
-  const [subjects, setSubjects] = useState<Record<string, { category: string; accuracy: number; total: number }>>({});
+  const [subjects, setSubjects] = useState<
+    Record<string, { category: string; accuracy: number; total: number }>
+  >({});
   const [history, setHistory] = useState<ExamAttempt[]>([]);
+  const [dailyDone, setDailyDone] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!user) return;
     (async () => {
       try {
-        const [s, r, sub, h] = await Promise.all([
+        const [s, r, sub, h, daily] = await Promise.all([
           getOverallStats(user.id),
           getRecommendations(user.id),
           getSubjectPerformance(user.id),
           getUserHistory(user.id, 5),
+          hasCompletedDailyChallengeToday(user.id),
         ]);
         setStats(s);
         setRecs(r);
         setSubjects(sub);
         setHistory(h);
+        setDailyDone(daily);
       } catch (e) {
         console.error(e);
       } finally {
@@ -56,7 +69,6 @@ export default function Dashboard() {
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 space-y-8">
-      {/* Welcome */}
       <div>
         <h1 className="text-2xl font-bold tracking-tight">
           {getGreeting()}, {name}.
@@ -64,7 +76,6 @@ export default function Dashboard() {
         <p className="text-[var(--muted-foreground)] mt-1">Ready for another round of LET-style practice?</p>
       </div>
 
-      {/* Stats cards */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
         <Card>
           <CardContent className="p-4">
@@ -102,7 +113,6 @@ export default function Dashboard() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
-        {/* Recommendations */}
         <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -122,17 +132,34 @@ export default function Dashboard() {
               </div>
             ) : (
               recs.map((r) => (
-                <div key={`${r.subject}-${r.topic}`} className="flex items-center justify-between rounded-xl border border-[var(--border)] p-3">
+                <div
+                  key={`${r.subject}-${r.topic}`}
+                  className="flex items-center justify-between rounded-xl border border-[var(--border)] p-3"
+                >
                   <div>
                     <div className="font-medium text-sm">{r.topic}</div>
-                    <div className="text-xs text-[var(--muted-foreground)]">{r.subject} · {r.attempts} attempts</div>
+                    <div className="text-xs text-[var(--muted-foreground)]">
+                      {r.subject} · {r.attempts} attempts
+                    </div>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className={`text-sm font-semibold ${r.accuracy < 60 ? 'text-red-600' : r.accuracy < 75 ? 'text-amber-600' : 'text-green-600'}`}>
+                    <span
+                      className={`text-sm font-semibold ${
+                        r.accuracy < 60
+                          ? 'text-red-600'
+                          : r.accuracy < 75
+                            ? 'text-amber-600'
+                            : 'text-green-600'
+                      }`}
+                    >
                       {formatPercent(r.accuracy)}
                     </span>
-                    <Link to={`/practice?category=${r.category}&subject=${encodeURIComponent(r.subject)}&topic=${encodeURIComponent(r.topic)}`}>
-                      <Button size="sm" variant="outline">Practice</Button>
+                    <Link
+                      to={`/practice?category=${r.category}&subject=${encodeURIComponent(r.subject)}&topic=${encodeURIComponent(r.topic)}`}
+                    >
+                      <Button size="sm" variant="outline">
+                        Practice
+                      </Button>
                     </Link>
                   </div>
                 </div>
@@ -141,24 +168,34 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        {/* Daily Challenge */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Daily LET Challenge</CardTitle>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Zap className="h-4 w-4 text-[var(--accent-color)]" />
+              Daily LET Challenge
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-[var(--muted-foreground)] mb-1">10 questions · Mixed topics</p>
+            <p className="text-sm text-[var(--muted-foreground)] mb-1">
+              {DAILY_CHALLENGE_COUNT} questions · Mixed topics · Practice mode
+            </p>
             <p className="text-sm mb-4">
               Current streak: <strong>{profile?.current_streak || 0} days</strong>
             </p>
-            <Link to="/practice?daily=1">
-              <Button className="w-full">Start Challenge</Button>
-            </Link>
+            {dailyDone ? (
+              <div className="rounded-xl border border-green-200 bg-green-50 dark:bg-green-900/20 dark:border-green-800 px-3 py-3 text-sm flex items-center gap-2 text-green-700 dark:text-green-300">
+                <CheckCircle2 className="h-4 w-4 shrink-0" />
+                Completed for today. Come back tomorrow!
+              </div>
+            ) : (
+              <Button className="w-full" onClick={() => navigate('/practice?daily=1')}>
+                Start Challenge
+              </Button>
+            )}
           </CardContent>
         </Card>
       </div>
 
-      {/* Subject performance */}
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader>
@@ -166,7 +203,9 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent className="space-y-3">
             {genEd.length === 0 ? (
-              <p className="text-sm text-[var(--muted-foreground)]">No data yet. Practice GenEd topics to see performance.</p>
+              <p className="text-sm text-[var(--muted-foreground)]">
+                No data yet. Practice GenEd topics to see performance.
+              </p>
             ) : (
               genEd.map(([name, v]) => (
                 <div key={name}>
@@ -186,7 +225,9 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent className="space-y-3">
             {profEd.length === 0 ? (
-              <p className="text-sm text-[var(--muted-foreground)]">No data yet. Practice ProfEd topics to see performance.</p>
+              <p className="text-sm text-[var(--muted-foreground)]">
+                No data yet. Practice ProfEd topics to see performance.
+              </p>
             ) : (
               profEd.map(([name, v]) => (
                 <div key={name}>
@@ -202,11 +243,13 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      {/* Recent activity */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-base">Recent Activity</CardTitle>
-          <Link to="/history" className="text-sm text-[var(--accent-color)] hover:underline flex items-center gap-1">
+          <Link
+            to="/history"
+            className="text-sm text-[var(--accent-color)] hover:underline flex items-center gap-1"
+          >
             View all <ArrowRight className="h-3 w-3" />
           </Link>
         </CardHeader>
@@ -222,15 +265,28 @@ export default function Dashboard() {
                   className="flex items-center justify-between rounded-xl border border-[var(--border)] p-3 hover:bg-[var(--muted)]/50 transition-colors"
                 >
                   <div className="flex items-center gap-3">
-                    {h.mode === 'mock' ? <ClipboardList className="h-4 w-4 text-[var(--muted-foreground)]" /> : <BookOpen className="h-4 w-4 text-[var(--muted-foreground)]" />}
+                    {h.mode === 'mock' ? (
+                      <ClipboardList className="h-4 w-4 text-[var(--muted-foreground)]" />
+                    ) : (
+                      <BookOpen className="h-4 w-4 text-[var(--muted-foreground)]" />
+                    )}
                     <div>
-                      <div className="text-sm font-medium">{h.subject || h.category || 'Mixed'}</div>
+                      <div className="text-sm font-medium">
+                        {h.is_daily_challenge
+                          ? 'Daily Challenge'
+                          : h.subject || h.category || 'Mixed'}
+                      </div>
                       <div className="text-xs text-[var(--muted-foreground)]">
                         {h.total_questions} questions · {h.mode}
+                        {h.is_daily_challenge ? ' · daily' : ''}
                       </div>
                     </div>
                   </div>
-                  <Badge variant={h.score_percent >= 75 ? 'success' : h.score_percent >= 50 ? 'warning' : 'error'}>
+                  <Badge
+                    variant={
+                      h.score_percent >= 75 ? 'success' : h.score_percent >= 50 ? 'warning' : 'error'
+                    }
+                  >
                     {formatPercent(Number(h.score_percent))}
                   </Badge>
                 </Link>

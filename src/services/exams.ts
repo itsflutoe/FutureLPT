@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import type { ExamAttempt, ExamAnswer, PracticeConfig, Question, ExamResultSummary } from '@/types';
+import { DAILY_CHALLENGE_COUNT } from '@/types';
 import { fetchQuestions } from './questions';
 import { updateStatsAfterAttempt } from './progress';
 import { recordActivity } from './streaks';
@@ -23,14 +24,13 @@ export async function createAttempt(
       total_questions: questions.length,
       time_limit_seconds: timeLimitSeconds || null,
       is_completed: false,
-      is_daily_challenge: false,
+      is_daily_challenge: !!config.isDailyChallenge,
     })
     .select()
     .single();
 
   if (error) throw error;
 
-  // Create answer placeholders
   const answerRows = questions.map((q) => ({
     attempt_id: data.id,
     question_id: q.id,
@@ -52,7 +52,6 @@ export async function saveAnswer(
   selected: 'A' | 'B' | 'C' | 'D' | null,
   isFlagged = false
 ) {
-  // Get correct answer
   const { data: ans } = await supabase
     .from('exam_answers')
     .select('correct_answer')
@@ -82,7 +81,6 @@ export async function completeAttempt(
   userId: string,
   timeUsedSeconds: number
 ): Promise<ExamResultSummary> {
-  // Fetch all answers with questions
   const { data: answers, error } = await supabase
     .from('exam_answers')
     .select(`
@@ -113,16 +111,17 @@ export async function completeAttempt(
 
   if (updError) throw updError;
 
-  // Update stats, streaks, achievements
+  const isDaily = !!(attempt as ExamAttempt).is_daily_challenge;
+
   await updateStatsAfterAttempt(userId, typedAnswers);
   await recordActivity(userId, {
     questionsAnswered: total,
     isPractice: attempt.mode === 'practice',
     isMock: attempt.mode === 'mock',
+    dailyChallenge: isDaily,
   });
   await checkAchievements(userId);
 
-  // Build summary
   const bySubject: Record<string, { correct: number; total: number; accuracy: number }> = {};
   const byTopic: Record<string, { correct: number; total: number; accuracy: number }> = {};
 
@@ -205,11 +204,29 @@ export async function startPractice(userId: string, config: PracticeConfig) {
     throw new Error('No questions found matching your criteria. Try different filters or add more questions.');
   }
 
-  if (questions.length < config.count) {
-    // Allow but warn via the returned length
-  }
-
-  const timeLimit = config.mode === 'mock' ? config.count * 90 : undefined; // ~1.5 min per question default
+  const timeLimit = config.mode === 'mock' ? config.count * 90 : undefined;
   const attempt = await createAttempt(userId, config, questions, timeLimit);
   return { attempt, questions };
+}
+
+/** 10 mixed questions, practice mode, flagged as daily challenge. */
+export async function startDailyChallenge(userId: string) {
+  return startPractice(userId, {
+    category: 'MIXED',
+    count: DAILY_CHALLENGE_COUNT,
+    difficulty: 'MIXED',
+    mode: 'practice',
+    isDailyChallenge: true,
+  });
+}
+
+export async function hasCompletedDailyChallengeToday(userId: string): Promise<boolean> {
+  const today = new Date().toISOString().slice(0, 10);
+  const { data } = await supabase
+    .from('user_daily_activity')
+    .select('daily_challenge_completed')
+    .eq('user_id', userId)
+    .eq('activity_date', today)
+    .maybeSingle();
+  return !!data?.daily_challenge_completed;
 }
