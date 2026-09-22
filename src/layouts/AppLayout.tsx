@@ -1,4 +1,4 @@
-import { Outlet, NavLink, useNavigate } from 'react-router-dom';
+import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
   BookOpen,
@@ -20,7 +20,6 @@ import { useState } from 'react';
 import { signOut } from '@/services/auth';
 import { cn } from '@/lib/utils';
 
-/** Primary student destinations — keep this list short. */
 const primaryNav = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/practice', label: 'Practice', icon: BookOpen },
@@ -28,7 +27,6 @@ const primaryNav = [
   { to: '/progress', label: 'Progress', icon: TrendingUp },
 ];
 
-/** Secondary review tools — grouped so the sidebar stays scannable. */
 const reviewNav = [
   { to: '/topics', label: 'Topics', icon: FolderOpen },
   { to: '/history', label: 'History', icon: History },
@@ -77,7 +75,12 @@ function NavItem({
 
 export default function AppLayout() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  /** Full-screen study mode: no app chrome competing with the exam UI. */
+  const isExamFocus =
+    location.pathname.startsWith('/exam/') || location.pathname.startsWith('/results/');
 
   const handleLogout = async () => {
     await signOut();
@@ -86,9 +89,16 @@ export default function AppLayout() {
 
   const closeMobile = () => setSidebarOpen(false);
 
+  if (isExamFocus) {
+    return (
+      <div className="min-h-screen bg-[var(--background)]">
+        <Outlet />
+      </div>
+    );
+  }
+
   return (
     <div className="flex min-h-screen bg-[var(--background)]">
-      {/* Desktop Sidebar */}
       <aside className="hidden lg:flex lg:w-60 lg:flex-col lg:fixed lg:inset-y-0 border-r border-[var(--border)] bg-[var(--card)]">
         <div className="flex h-16 items-center gap-2 px-5 border-b border-[var(--border)]">
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--accent-color)] text-white font-bold text-sm">
@@ -106,7 +116,6 @@ export default function AppLayout() {
               <NavItem key={item.to} {...item} />
             ))}
           </div>
-
           <div>
             <div className="px-3 mb-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--muted-foreground)]">
               Review
@@ -132,7 +141,6 @@ export default function AppLayout() {
         </div>
       </aside>
 
-      {/* Mobile header */}
       <div className="lg:hidden fixed top-0 inset-x-0 z-40 flex h-14 items-center justify-between border-b border-[var(--border)] bg-[var(--card)] px-4">
         <div className="flex items-center gap-2">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--accent-color)] text-white font-bold text-xs">
@@ -145,7 +153,6 @@ export default function AppLayout() {
         </button>
       </div>
 
-      {/* Mobile drawer */}
       {sidebarOpen && (
         <div className="lg:hidden fixed inset-0 z-50">
           <div className="absolute inset-0 bg-black/40" onClick={closeMobile} />
@@ -187,15 +194,16 @@ export default function AppLayout() {
         </div>
       )}
 
-      {/* Main content */}
       <main className="flex-1 lg:pl-60">
         <div className="min-h-screen pt-14 lg:pt-0 pb-20 lg:pb-0">
           <Outlet />
         </div>
       </main>
 
-      {/* Mobile bottom nav */}
-      <nav className="lg:hidden fixed bottom-0 inset-x-0 z-40 border-t border-[var(--border)] bg-[var(--card)]">
+      <nav
+        className="lg:hidden fixed bottom-0 inset-x-0 z-40 border-t border-[var(--border)] bg-[var(--card)]"
+        style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+      >
         <div className="flex justify-around py-2">
           {bottomNav.map((item) => (
             <NavLink
@@ -203,7 +211,7 @@ export default function AppLayout() {
               to={item.to}
               className={({ isActive }) =>
                 cn(
-                  'flex flex-col items-center gap-0.5 px-2 py-1 text-xs',
+                  'flex flex-col items-center gap-0.5 px-2 py-1 text-xs min-w-[3.25rem]',
                   isActive ? 'text-[var(--accent-color)]' : 'text-[var(--muted-foreground)]'
                 )
               }

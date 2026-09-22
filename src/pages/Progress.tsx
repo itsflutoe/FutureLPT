@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { getOverallStats, getTopicStats, getSubjectPerformance } from '@/services/progress';
 import { formatPercent } from '@/lib/utils';
@@ -6,12 +7,35 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { Spinner } from '@/components/ui/Spinner';
 import type { UserTopicStat } from '@/types';
+import {
+  History,
+  Bookmark,
+  AlertCircle,
+  Trophy,
+  FolderOpen,
+  ChevronRight,
+} from 'lucide-react';
+
+const reviewLinks = [
+  { to: '/history', label: 'History', desc: 'Past practice & mocks', icon: History },
+  { to: '/mistakes', label: 'Mistakes', desc: 'Review wrong answers', icon: AlertCircle },
+  { to: '/bookmarks', label: 'Bookmarks', desc: 'Saved questions', icon: Bookmark },
+  { to: '/achievements', label: 'Achievements', desc: 'Badges & milestones', icon: Trophy },
+  { to: '/topics', label: 'Topics', desc: 'Browse by topic', icon: FolderOpen },
+];
 
 export default function Progress() {
   const { user, profile } = useAuth();
-  const [stats, setStats] = useState({ questionsAnswered: 0, accuracy: 0, mockExamsCompleted: 0, practiceSessions: 0 });
+  const [stats, setStats] = useState({
+    questionsAnswered: 0,
+    accuracy: 0,
+    mockExamsCompleted: 0,
+    practiceSessions: 0,
+  });
   const [topics, setTopics] = useState<UserTopicStat[]>([]);
-  const [subjects, setSubjects] = useState<Record<string, { category: string; accuracy: number; total: number }>>({});
+  const [subjects, setSubjects] = useState<
+    Record<string, { category: string; accuracy: number; total: number }>
+  >({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -25,27 +49,85 @@ export default function Progress() {
       .finally(() => setLoading(false));
   }, [user]);
 
-  if (loading) return <div className="flex justify-center py-32"><Spinner /></div>;
+  if (loading)
+    return (
+      <div className="flex justify-center py-32">
+        <Spinner />
+      </div>
+    );
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-8 space-y-8">
+    <div className="mx-auto max-w-4xl px-4 py-6 sm:py-8 space-y-6">
       <h1 className="text-2xl font-bold">Progress</h1>
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <Card><CardContent className="p-4"><div className="text-xs text-[var(--muted-foreground)]">Accuracy</div><div className="text-2xl font-bold">{formatPercent(stats.accuracy)}</div></CardContent></Card>
-        <Card><CardContent className="p-4"><div className="text-xs text-[var(--muted-foreground)]">Answered</div><div className="text-2xl font-bold">{stats.questionsAnswered}</div></CardContent></Card>
-        <Card><CardContent className="p-4"><div className="text-xs text-[var(--muted-foreground)]">Mocks</div><div className="text-2xl font-bold">{stats.mockExamsCompleted}</div></CardContent></Card>
-        <Card><CardContent className="p-4"><div className="text-xs text-[var(--muted-foreground)]">Streak</div><div className="text-2xl font-bold">{profile?.current_streak || 0}</div></CardContent></Card>
+
+      {/* Review hub — mobile-friendly shortcuts */}
+      <div>
+        <h2 className="text-sm font-semibold text-[var(--muted-foreground)] mb-2 uppercase tracking-wide">
+          Review
+        </h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          {reviewLinks.map((item) => (
+            <Link
+              key={item.to}
+              to={item.to}
+              className="flex items-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--card)] p-3 hover:bg-[var(--muted)]/40 transition-colors"
+            >
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--muted)] shrink-0">
+                <item.icon className="h-5 w-5 text-[var(--accent-color)]" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="font-medium text-sm">{item.label}</div>
+                <div className="text-xs text-[var(--muted-foreground)]">{item.desc}</div>
+              </div>
+              <ChevronRight className="h-4 w-4 text-[var(--muted-foreground)] shrink-0" />
+            </Link>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-xs text-[var(--muted-foreground)]">Accuracy</div>
+            <div className="text-2xl font-bold">{formatPercent(stats.accuracy)}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-xs text-[var(--muted-foreground)]">Answered</div>
+            <div className="text-2xl font-bold">{stats.questionsAnswered}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-xs text-[var(--muted-foreground)]">Mocks</div>
+            <div className="text-2xl font-bold">{stats.mockExamsCompleted}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-xs text-[var(--muted-foreground)]">Streak</div>
+            <div className="text-2xl font-bold">{profile?.current_streak || 0}</div>
+          </CardContent>
+        </Card>
       </div>
 
       <Card>
-        <CardHeader><CardTitle className="text-base">By Subject</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle className="text-base">By Subject</CardTitle>
+        </CardHeader>
         <CardContent className="space-y-3">
           {Object.entries(subjects).length === 0 ? (
             <p className="text-sm text-[var(--muted-foreground)]">No data yet.</p>
           ) : (
             Object.entries(subjects).map(([name, v]) => (
               <div key={name}>
-                <div className="flex justify-between text-sm mb-1"><span>{name}</span><span>{formatPercent(v.accuracy)} · {v.total} Q</span></div>
+                <div className="flex justify-between text-sm mb-1">
+                  <span className="truncate pr-2">{name}</span>
+                  <span className="shrink-0">
+                    {formatPercent(v.accuracy)} · {v.total} Q
+                  </span>
+                </div>
                 <ProgressBar value={v.accuracy} />
               </div>
             ))
@@ -54,7 +136,9 @@ export default function Progress() {
       </Card>
 
       <Card>
-        <CardHeader><CardTitle className="text-base">By Topic</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle className="text-base">By Topic</CardTitle>
+        </CardHeader>
         <CardContent>
           {topics.length === 0 ? (
             <p className="text-sm text-[var(--muted-foreground)]">No topic data yet.</p>

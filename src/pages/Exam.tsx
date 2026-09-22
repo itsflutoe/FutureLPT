@@ -143,6 +143,12 @@ export default function Exam() {
     }
   }, [attemptId, user, submitting, navigate]);
 
+  const handleExit = () => {
+    if (window.confirm('Leave this session? Your answers so far are saved. You can review completed attempts in History.')) {
+      navigate('/dashboard');
+    }
+  };
+
   if (loading || !q) {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -159,39 +165,55 @@ export default function Exam() {
   ];
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-6 min-h-screen flex flex-col">
-      <div className="flex items-center justify-between mb-4 sticky top-0 bg-[var(--background)] z-10 py-2">
-        <div className="text-sm font-medium">
-          Question {current + 1} / {questions.length}
-        </div>
-        {timeLeft !== null && !isPractice && (
-          <div className={`font-mono text-sm font-semibold ${timeLeft < 300 ? 'text-red-600' : ''}`}>
-            {formatDuration(timeLeft)}
+    <div className="mx-auto max-w-3xl min-h-screen flex flex-col bg-[var(--background)]">
+      {/* Focus header — no app chrome */}
+      <header className="sticky top-0 z-20 border-b border-[var(--border)] bg-[var(--background)]/95 backdrop-blur px-3 pt-[max(0.5rem,env(safe-area-inset-top))] pb-2">
+        <div className="flex items-center justify-between gap-2">
+          <button
+            type="button"
+            onClick={handleExit}
+            className="text-sm text-[var(--muted-foreground)] hover:text-[var(--foreground)] px-1 py-2"
+          >
+            Exit
+          </button>
+          <div className="text-sm font-semibold tabular-nums">
+            {current + 1} / {questions.length}
           </div>
-        )}
-        <div className="flex gap-2">
-          <button onClick={toggleFlag} className="p-2 rounded-lg hover:bg-[var(--muted)]" aria-label="Flag">
-            <Flag className={`h-5 w-5 ${flagged.has(q.id) ? 'text-amber-500 fill-amber-500' : ''}`} />
-          </button>
-          <button onClick={toggleBookmark} className="p-2 rounded-lg hover:bg-[var(--muted)]" aria-label="Bookmark">
-            <Bookmark className={`h-5 w-5 ${bookmarked ? 'text-[var(--accent-color)] fill-current' : ''}`} />
-          </button>
+          <div className="flex items-center gap-0.5">
+            {timeLeft !== null && !isPractice && (
+              <span
+                className={`font-mono text-xs font-semibold mr-1 ${timeLeft < 300 ? 'text-red-600' : ''}`}
+              >
+                {formatDuration(timeLeft)}
+              </span>
+            )}
+            <button onClick={toggleFlag} className="p-2 rounded-lg hover:bg-[var(--muted)]" aria-label="Flag">
+              <Flag className={`h-5 w-5 ${flagged.has(q.id) ? 'text-amber-500 fill-amber-500' : ''}`} />
+            </button>
+            <button
+              onClick={toggleBookmark}
+              className="p-2 rounded-lg hover:bg-[var(--muted)]"
+              aria-label="Bookmark"
+            >
+              <Bookmark className={`h-5 w-5 ${bookmarked ? 'text-[var(--accent-color)] fill-current' : ''}`} />
+            </button>
+          </div>
         </div>
-      </div>
+        <div className="h-1.5 w-full bg-[var(--muted)] rounded-full mt-1">
+          <div
+            className="h-full bg-[var(--accent-color)] rounded-full transition-all"
+            style={{ width: `${((current + 1) / questions.length) * 100}%` }}
+          />
+        </div>
+      </header>
 
-      <div className="h-1.5 w-full bg-[var(--muted)] rounded-full mb-6">
-        <div
-          className="h-full bg-[var(--accent-color)] rounded-full transition-all"
-          style={{ width: `${((current + 1) / questions.length) * 100}%` }}
-        />
-      </div>
-
-      <div className="flex-1">
-        <div className="mb-2 flex gap-2">
+      {/* Question body — pad bottom for fixed controls */}
+      <div className="flex-1 px-4 py-4 pb-36">
+        <div className="mb-2 flex flex-wrap gap-2">
           <Badge variant="outline">{q.subject}</Badge>
           <Badge variant="outline">{q.difficulty.toLowerCase()}</Badge>
         </div>
-        <p className="text-lg leading-relaxed mb-6">{q.question}</p>
+        <p className="text-base sm:text-lg leading-relaxed mb-5">{q.question}</p>
 
         <div className="space-y-3">
           {options.map((opt) => {
@@ -219,7 +241,7 @@ export default function Exam() {
                 type="button"
                 onClick={() => handleSelect(opt.key)}
                 disabled={!!(isPractice && showFeedback)}
-                className={`w-full text-left rounded-xl border-2 px-4 py-3.5 text-sm transition-colors flex items-start gap-3 ${style}`}
+                className={`w-full text-left rounded-xl border-2 px-4 py-3.5 text-sm transition-colors flex items-start gap-3 min-h-[48px] ${style}`}
               >
                 <span className="font-semibold shrink-0 w-6">{opt.key}.</span>
                 <span className="flex-1">{opt.text}</span>
@@ -257,47 +279,56 @@ export default function Exam() {
         )}
       </div>
 
-      <div className="mt-6 pt-4 border-t border-[var(--border)]">
-        <div className="flex flex-wrap gap-1.5 mb-4 max-h-24 overflow-y-auto">
-          {questions.map((qq, i) => {
-            const ans = answers[qq.id];
-            const isFlag = flagged.has(qq.id);
-            let cls = 'bg-[var(--muted)] text-[var(--muted-foreground)]';
-            if (i === current) cls = 'bg-[var(--accent-color)] text-white';
-            else if (ans?.selected_answer) cls = 'bg-[var(--accent-color)]/20 text-[var(--accent-color)]';
-            if (isFlag) cls += ' ring-2 ring-amber-400';
-            return (
-              <button
-                key={qq.id}
-                type="button"
-                onClick={() => setCurrent(i)}
-                className={`h-8 w-8 rounded-lg text-xs font-medium ${cls}`}
+      {/* Fixed bottom controls — always visible */}
+      <footer
+        className="fixed bottom-0 inset-x-0 z-20 border-t border-[var(--border)] bg-[var(--card)]/95 backdrop-blur px-3 pt-2"
+        style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
+      >
+        <div className="mx-auto max-w-3xl">
+          <div className="flex gap-1.5 overflow-x-auto pb-2 scrollbar-none">
+            {questions.map((qq, i) => {
+              const ans = answers[qq.id];
+              const isFlag = flagged.has(qq.id);
+              let cls = 'bg-[var(--muted)] text-[var(--muted-foreground)]';
+              if (i === current) cls = 'bg-[var(--accent-color)] text-white';
+              else if (ans?.selected_answer) cls = 'bg-[var(--accent-color)]/20 text-[var(--accent-color)]';
+              if (isFlag) cls += ' ring-2 ring-amber-400';
+              return (
+                <button
+                  key={qq.id}
+                  type="button"
+                  onClick={() => setCurrent(i)}
+                  className={`h-9 w-9 shrink-0 rounded-lg text-xs font-medium ${cls}`}
+                >
+                  {i + 1}
+                </button>
+              );
+            })}
+          </div>
+          <div className="flex items-center justify-between gap-3">
+            <Button
+              variant="outline"
+              onClick={() => setCurrent((c) => Math.max(0, c - 1))}
+              disabled={current === 0}
+              className="gap-1 min-h-11 flex-1 sm:flex-none"
+            >
+              <ChevronLeft className="h-4 w-4" /> Prev
+            </Button>
+            {current < questions.length - 1 ? (
+              <Button
+                onClick={() => setCurrent((c) => c + 1)}
+                className="gap-1 min-h-11 flex-1 sm:flex-none"
               >
-                {i + 1}
-              </button>
-            );
-          })}
+                Next <ChevronRight className="h-4 w-4" />
+              </Button>
+            ) : (
+              <Button onClick={handleSubmit} disabled={submitting} className="min-h-11 flex-1 sm:flex-none">
+                {submitting ? 'Submitting…' : 'Submit'}
+              </Button>
+            )}
+          </div>
         </div>
-        <div className="flex items-center justify-between gap-3">
-          <Button
-            variant="outline"
-            onClick={() => setCurrent((c) => Math.max(0, c - 1))}
-            disabled={current === 0}
-            className="gap-1"
-          >
-            <ChevronLeft className="h-4 w-4" /> Prev
-          </Button>
-          {current < questions.length - 1 ? (
-            <Button onClick={() => setCurrent((c) => c + 1)} className="gap-1">
-              Next <ChevronRight className="h-4 w-4" />
-            </Button>
-          ) : (
-            <Button onClick={handleSubmit} disabled={submitting}>
-              {submitting ? 'Submitting…' : 'Submit Exam'}
-            </Button>
-          )}
-        </div>
-      </div>
+      </footer>
     </div>
   );
 }
