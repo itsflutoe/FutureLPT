@@ -11,31 +11,29 @@ All practice material is **LET-style practice material** and is **not** actual P
 - Username + password authentication (Supabase Auth)
 - Practice mode with explanations after each answer
 - Timed mock exam mode with question navigator
-- General Education & Professional Education categories
+- General Education, Professional Education, and Mixed categories
 - Subject / topic filtering, difficulty, custom question counts
-- Dashboard with stats, recommendations, streaks, daily challenge entry
+- Dashboard with stats, recommendations, streaks
 - Progress analytics by subject and topic
 - Weak-area detection and recommendations
 - Bookmarks and Mistakes review
 - Achievements and study streaks
 - Theme (system / light / dark) + accent colors
-- Admin panel: question management, CSV import, users
-- Fully responsive (desktop sidebar + mobile bottom nav)
+- Admin panel: questions, CSV import/export, users, password reset, bank statistics
+- Responsive layout (desktop sidebar + mobile bottom nav)
 - Architecture ready for 5,000–10,000+ questions
 
 ## Tech Stack
 
 - **Frontend:** React 19, TypeScript, Vite, Tailwind CSS v4
-- **Backend:** Supabase (Auth, PostgreSQL, RLS)
+- **Backend:** Supabase (Auth, PostgreSQL, RLS, Edge Functions)
 - **Routing:** React Router v7
-- **Charts / icons:** Recharts, Lucide React
 - **Deploy:** Vercel + Supabase
 
 ## Quick Start
 
 ```bash
-cd flpt
-cp .env.example .env
+cp env.example .env
 # Edit .env with your Supabase URL and anon key
 npm install
 npm run dev
@@ -57,67 +55,107 @@ VITE_SUPABASE_ANON_KEY=your-anon-key
 
 Never put the service-role key in the frontend.
 
-## Supabase Setup
+## Authentication (username-only UX)
 
-1. Create a project at https://supabase.com
-2. In **Authentication → Providers**, ensure Email is enabled.  
-   (This app uses synthetic emails `username@flpt.local` for username+password login.)
-3. Run the SQL migrations in order in the SQL Editor:
+FLPT never asks users for an email address.
 
-   - `supabase/migrations/001_initial_schema.sql`
-   - `supabase/migrations/002_rls_policies.sql`
-   - `supabase/migrations/003_seed_questions.sql`
+Internally Supabase still needs an email identity:
 
-4. (Optional) Disable email confirmation for local testing under Auth settings, or configure a custom SMTP / redirect for recovery emails.
-5. To promote a user to admin:
+`username` → `username@flpt.app`
+
+### Signup (no confirmation email)
+
+Preferred path: Edge Function `create-account` using service role with `email_confirm: true`.
+
+```bash
+supabase functions deploy create-account
+```
+
+Fallback: client `signUp` when Confirm email is **OFF** in Supabase Auth settings.
+
+### Password recovery
+
+Users do **not** use Supabase email recovery.
+
+Flow:
+
+1. Forgot Password → instructions
+2. Message admin on Facebook (URL in `src/config/support.ts`)
+3. Admin verifies username → **Admin → Users → Manage User → Reset Password**
+4. User signs in with username + new password
+
+Admin reset Edge Function:
+
+```bash
+supabase functions deploy admin-reset-password
+```
+
+### Promote an admin
 
 ```sql
 UPDATE public.profiles SET role = 'ADMIN' WHERE username = 'yourusername';
 ```
 
+Then log out and log in again.
+
+## Supabase Setup
+
+1. Create a project at https://supabase.com
+2. Authentication → Providers → Email enabled
+3. For username-only apps, turn **OFF** “Confirm email” unless `create-account` is deployed
+4. Run SQL migrations in order:
+
+   - `supabase/migrations/001_initial_schema.sql`
+   - `supabase/migrations/002_rls_policies.sql`
+   - `supabase/migrations/003_seed_questions.sql`
+   - `supabase/migrations/004_username_exists.sql`
+   - `supabase/migrations/005_question_bank_stats.sql`
+
+5. Deploy Edge Functions as needed (see above)
+
 ## CSV Import (Admin)
 
 Go to `/admin/import` (admin role required).
-
-Expected columns (flexible header names):
 
 ```
 Category, Subject, Topic, Difficulty, Question, A, B, C, D, Correct Answer, Rationale, Reference
 ```
 
-Validation rejects missing questions, invalid answers, etc. before insert.
+- Category must be `GENERAL_EDUCATION`, `PROFESSIONAL_EDUCATION`, or `SPECIALIZATION`
+- Correct Answer must be `A`, `B`, `C`, or `D`
+- UTF-8 CSV; quote fields that contain commas
 
 ## Project Structure
 
 ```
 src/
-  components/     # UI + layout pieces
+  components/     # UI + ProtectedRoute
   pages/          # Route pages (+ admin/)
   layouts/        # AppLayout
   hooks/          # useAuth, useTheme
   lib/            # supabase client, utils
-  services/       # auth, questions, exams, progress, streaks, achievements, bookmarks
+  services/       # auth, questions, exams, progress, streaks, achievements, bookmarks, stats
+  config/         # support links (Facebook admin URL)
   types/          # shared TypeScript types
 supabase/
-  migrations/     # SQL schema, RLS, seed
+  migrations/     # SQL schema, RLS, seed, stats RPC
+  functions/      # create-account, admin-reset-password
 ```
 
 ## Core User Flow
 
-1. Register → Login  
-2. Dashboard (stats / recommendations)  
-3. Practice → select category/subject/count → Start  
-4. Answer questions (practice shows explanations; mock is timed)  
-5. Submit → Results + review  
-6. Stats, weak areas, and recommendations update automatically  
+1. Register → Login
+2. Dashboard (stats / recommendations)
+3. Practice → select filters → Start
+4. Answer (practice shows explanations; mock is timed)
+5. Submit → Results + review
+6. Stats, weak areas, and recommendations update automatically
 
 ## Notes
 
-- Question bank is stored in PostgreSQL only (not in frontend JS).
-- Exam answers are stored per-question for future analytics.
-- Auth uses username mapped to `username@flpt.local` for Supabase email-based auth.
-- Password recovery uses Supabase’s built-in secure flow.
-- Initial seed contains a small set of original LET-style items; use CSV import for larger batches.
+- Question bank lives in PostgreSQL only (not hardcoded in the frontend)
+- Exam answers are stored per question for analytics
+- Initial seed is small; use CSV import for larger batches
 
 ## License / Disclaimer
 
