@@ -13,21 +13,32 @@ import { ChevronDown, ChevronUp, Zap } from 'lucide-react';
 const QUICK_COUNTS = [10, 20, 50];
 const DIFFICULTIES: (Difficulty | 'MIXED')[] = ['EASY', 'MODERATE', 'DIFFICULT', 'MIXED'];
 
+function parseCategory(v: string | null): PracticeCategory {
+  if (v === 'GENERAL_EDUCATION' || v === 'PROFESSIONAL_EDUCATION' || v === 'MIXED') return v;
+  return 'MIXED';
+}
+
 export default function Practice() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const isDaily = searchParams.get('daily') === '1';
+  const autoMock = searchParams.get('mode') === 'mock' && searchParams.get('count');
 
-  const [category, setCategory] = useState<PracticeCategory>(
-    (searchParams.get('category') as PracticeCategory) || 'MIXED'
-  );
-  const [subject, setSubject] = useState(searchParams.get('subject') || '');
-  const [topic, setTopic] = useState(searchParams.get('topic') || '');
-  const [count, setCount] = useState(20);
+  const initialCategory = parseCategory(searchParams.get('category'));
+  const initialSubject = searchParams.get('subject') || '';
+  const initialTopic = searchParams.get('topic') || '';
+  const initialCount = parseInt(searchParams.get('count') || '20', 10) || 20;
+
+  const [category, setCategory] = useState<PracticeCategory>(initialCategory);
+  const [subject, setSubject] = useState(initialSubject);
+  const [topic, setTopic] = useState(initialTopic);
+  const [count, setCount] = useState(initialCount);
   const [customCount, setCustomCount] = useState('');
   const [difficulty, setDifficulty] = useState<Difficulty | 'MIXED'>('MIXED');
-  const [mode, setMode] = useState<'practice' | 'mock'>('practice');
+  const [mode, setMode] = useState<'practice' | 'mock'>(
+    searchParams.get('mode') === 'mock' ? 'mock' : 'practice'
+  );
   const [subjects, setSubjects] = useState<string[]>([]);
   const [topics, setTopics] = useState<string[]>([]);
   const [available, setAvailable] = useState<number | null>(null);
@@ -36,12 +47,12 @@ export default function Practice() {
   const [showAdvanced, setShowAdvanced] = useState(
     !!(searchParams.get('subject') || searchParams.get('topic') || searchParams.get('category'))
   );
-  const dailyStarted = useRef(false);
+  const autoStarted = useRef(false);
 
-  // Auto-start Daily Challenge when /practice?daily=1
+  // Daily challenge auto-start
   useEffect(() => {
-    if (!user || !isDaily || dailyStarted.current) return;
-    dailyStarted.current = true;
+    if (!user || !isDaily || autoStarted.current) return;
+    autoStarted.current = true;
     (async () => {
       setLoading(true);
       setError('');
@@ -56,8 +67,33 @@ export default function Practice() {
     })();
   }, [user, isDaily, navigate]);
 
+  // Deep-link mock auto-start: /practice?category=X&count=N&mode=mock
   useEffect(() => {
-    if (isDaily) return;
+    if (!user || isDaily || !autoMock || autoStarted.current) return;
+    autoStarted.current = true;
+    (async () => {
+      setLoading(true);
+      setError('');
+      try {
+        const n = parseInt(searchParams.get('count') || '50', 10) || 50;
+        const cat = parseCategory(searchParams.get('category'));
+        const { attempt, questions } = await startPractice(user.id, {
+          category: cat,
+          count: n,
+          difficulty: 'MIXED',
+          mode: 'mock',
+        });
+        sessionStorage.setItem(`exam_${attempt.id}`, JSON.stringify(questions));
+        navigate(`/exam/${attempt.id}`, { replace: true });
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : 'Could not start mock exam.');
+        setLoading(false);
+      }
+    })();
+  }, [user, isDaily, autoMock, searchParams, navigate]);
+
+  useEffect(() => {
+    if (isDaily || autoMock) return;
     getSubjects(category)
       .then(setSubjects)
       .catch(() =>
@@ -69,21 +105,20 @@ export default function Practice() {
               : [...GEN_ED_SUBJECTS, ...PROF_ED_SUBJECTS]
         )
       );
-    // Only reset subject/topic when category changes manually, not on first mount with query params
-  }, [category, isDaily]);
+  }, [category, isDaily, autoMock]);
 
   useEffect(() => {
-    if (isDaily) return;
+    if (isDaily || autoMock) return;
     if (subject) {
       getTopics(category, subject).then(setTopics).catch(() => setTopics([]));
     } else {
       setTopics([]);
-      setTopic('');
+      if (!initialTopic) setTopic('');
     }
-  }, [category, subject, isDaily]);
+  }, [category, subject, isDaily, autoMock]);
 
   useEffect(() => {
-    if (isDaily) return;
+    if (isDaily || autoMock) return;
     getQuestionCount({
       category,
       subject: subject || undefined,
@@ -92,7 +127,7 @@ export default function Practice() {
     })
       .then(setAvailable)
       .catch(() => setAvailable(null));
-  }, [category, subject, topic, difficulty, isDaily]);
+  }, [category, subject, topic, difficulty, isDaily, autoMock]);
 
   const handleStart = async (override?: Partial<PracticeConfig>) => {
     if (!user) return;
@@ -123,13 +158,15 @@ export default function Practice() {
     }
   };
 
-  if (isDaily) {
+  if (isDaily || autoMock) {
     return (
       <div className="mx-auto max-w-md px-4 py-16 text-center space-y-4">
         <Zap className="h-10 w-10 mx-auto text-[var(--accent-color)]" />
-        <h1 className="text-xl font-bold">Daily LET Challenge</h1>
+        <h1 className="text-xl font-bold">{isDaily ? 'Daily LET Challenge' : 'Starting mock exam'}</h1>
         <p className="text-sm text-[var(--muted-foreground)]">
-          {DAILY_CHALLENGE_COUNT} mixed questions · keeping your streak alive
+          {isDaily
+            ? `${DAILY_CHALLENGE_COUNT} mixed questions · keeping your streak alive`
+            : 'Loading timed questions…'}
         </p>
         {error ? (
           <div className="rounded-xl bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 px-4 py-3 text-sm">
@@ -141,8 +178,8 @@ export default function Practice() {
           </div>
         )}
         {error && (
-          <Button variant="outline" onClick={() => navigate('/practice', { replace: true })}>
-            Back to Practice
+          <Button variant="outline" onClick={() => navigate(isDaily ? '/practice' : '/mock-exams', { replace: true })}>
+            Back
           </Button>
         )}
       </div>
@@ -150,11 +187,10 @@ export default function Practice() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl px-4 py-8">
+    <div className="mx-auto max-w-2xl px-4 py-6 sm:py-8">
       <h1 className="text-2xl font-bold tracking-tight">Practice</h1>
       <p className="text-[var(--muted-foreground)] mt-1 mb-6">Start fast, or fine-tune filters below.</p>
 
-      {/* Quick start */}
       <Card className="mb-4">
         <CardHeader>
           <CardTitle className="text-base">Quick start</CardTitle>
@@ -181,7 +217,7 @@ export default function Practice() {
             ))}
           </div>
           <Button
-            className="w-full"
+            className="w-full min-h-12"
             size="lg"
             disabled={loading}
             onClick={() =>
@@ -193,7 +229,6 @@ export default function Practice() {
         </CardContent>
       </Card>
 
-      {/* Advanced filters */}
       <Card>
         <button
           type="button"
@@ -223,7 +258,7 @@ export default function Practice() {
                       setSubject('');
                       setTopic('');
                     }}
-                    className={`rounded-xl border px-4 py-3 text-sm font-medium transition-colors ${
+                    className={`rounded-xl border px-4 py-3 text-sm font-medium transition-colors min-h-11 ${
                       category === c.id
                         ? 'border-[var(--accent-color)] bg-[var(--accent-color)]/10 text-[var(--accent-color)]'
                         : 'border-[var(--border)] hover:bg-[var(--muted)]'
@@ -280,7 +315,7 @@ export default function Practice() {
                       setCount(c);
                       setCustomCount('');
                     }}
-                    className={`rounded-lg border px-3 py-1.5 text-sm ${
+                    className={`rounded-lg border px-3 py-1.5 text-sm min-h-9 ${
                       count === c && !customCount
                         ? 'border-[var(--accent-color)] bg-[var(--accent-color)]/10 text-[var(--accent-color)]'
                         : 'border-[var(--border)]'
@@ -314,7 +349,7 @@ export default function Practice() {
                     key={d}
                     type="button"
                     onClick={() => setDifficulty(d)}
-                    className={`rounded-lg border px-3 py-1.5 text-sm capitalize ${
+                    className={`rounded-lg border px-3 py-1.5 text-sm capitalize min-h-9 ${
                       difficulty === d
                         ? 'border-[var(--accent-color)] bg-[var(--accent-color)]/10 text-[var(--accent-color)]'
                         : 'border-[var(--border)]'
@@ -332,7 +367,7 @@ export default function Practice() {
                 <button
                   type="button"
                   onClick={() => setMode('practice')}
-                  className={`rounded-xl border px-4 py-3 text-sm font-medium ${
+                  className={`rounded-xl border px-4 py-3 text-sm font-medium min-h-11 ${
                     mode === 'practice'
                       ? 'border-[var(--accent-color)] bg-[var(--accent-color)]/10 text-[var(--accent-color)]'
                       : 'border-[var(--border)]'
@@ -346,7 +381,7 @@ export default function Practice() {
                 <button
                   type="button"
                   onClick={() => setMode('mock')}
-                  className={`rounded-xl border px-4 py-3 text-sm font-medium ${
+                  className={`rounded-xl border px-4 py-3 text-sm font-medium min-h-11 ${
                     mode === 'mock'
                       ? 'border-[var(--accent-color)] bg-[var(--accent-color)]/10 text-[var(--accent-color)]'
                       : 'border-[var(--border)]'
@@ -366,7 +401,7 @@ export default function Practice() {
               </div>
             )}
 
-            <Button className="w-full" size="lg" onClick={() => handleStart()} disabled={loading}>
+            <Button className="w-full min-h-12" size="lg" onClick={() => handleStart()} disabled={loading}>
               {loading ? <Spinner className="h-5 w-5" /> : 'Start with these filters'}
             </Button>
           </CardContent>
