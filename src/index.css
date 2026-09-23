@@ -40,6 +40,8 @@
 html {
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
+  overflow-x: clip;
+  max-width: 100%;
 }
 
 body {
@@ -51,6 +53,16 @@ body {
   min-height: 100dvh;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  overflow-x: clip;
+  max-width: 100%;
+  width: 100%;
+}
+
+#root {
+  overflow-x: clip;
+  max-width: 100%;
+  width: 100%;
+  min-height: 100%;
 }
 
 /* Touch-friendly defaults */
@@ -58,6 +70,13 @@ button,
 [role='button'],
 a {
   -webkit-tap-highlight-color: transparent;
+}
+
+/* Prevent iOS/Android focus zoom on form fields */
+input,
+select,
+textarea {
+  font-size: 16px;
 }
 
 /* Focus styles for accessibility */

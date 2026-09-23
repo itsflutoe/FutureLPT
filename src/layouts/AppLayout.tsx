@@ -78,7 +78,6 @@ export default function AppLayout() {
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  /** Full-screen study mode: no app chrome competing with the exam UI. */
   const isExamFocus =
     location.pathname.startsWith('/exam/') || location.pathname.startsWith('/results/');
 
@@ -91,20 +90,20 @@ export default function AppLayout() {
 
   if (isExamFocus) {
     return (
-      <div className="min-h-screen bg-[var(--background)]">
+      <div className="min-h-screen max-w-[100vw] overflow-x-clip bg-[var(--background)]">
         <Outlet />
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen bg-[var(--background)]">
+    <div className="flex min-h-screen max-w-[100vw] overflow-x-clip bg-[var(--background)]">
       <aside className="hidden lg:flex lg:w-60 lg:flex-col lg:fixed lg:inset-y-0 border-r border-[var(--border)] bg-[var(--card)]">
         <div className="flex h-16 items-center gap-2 px-5 border-b border-[var(--border)]">
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--accent-color)] text-white font-bold text-sm">
             FL
           </div>
-          <div>
+          <div className="min-w-0">
             <div className="font-semibold text-sm">FLPT</div>
             <div className="text-xs text-[var(--muted-foreground)]">Find · Learn · Pass · Teach</div>
           </div>
@@ -141,14 +140,14 @@ export default function AppLayout() {
         </div>
       </aside>
 
-      <div className="lg:hidden fixed top-0 inset-x-0 z-40 flex h-14 items-center justify-between border-b border-[var(--border)] bg-[var(--card)] px-4">
-        <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--accent-color)] text-white font-bold text-xs">
+      <div className="lg:hidden fixed top-0 inset-x-0 z-40 flex h-14 items-center justify-between border-b border-[var(--border)] bg-[var(--card)] px-4 max-w-[100vw]">
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--accent-color)] text-white font-bold text-xs shrink-0">
             FL
           </div>
           <span className="font-semibold text-sm">FLPT</span>
         </div>
-        <button onClick={() => setSidebarOpen(true)} aria-label="Open menu">
+        <button onClick={() => setSidebarOpen(true)} aria-label="Open menu" className="shrink-0 p-1">
           <Menu className="h-6 w-6" />
         </button>
       </div>
@@ -156,7 +155,7 @@ export default function AppLayout() {
       {sidebarOpen && (
         <div className="lg:hidden fixed inset-0 z-50">
           <div className="absolute inset-0 bg-black/40" onClick={closeMobile} />
-          <div className="absolute inset-y-0 left-0 w-72 bg-[var(--card)] shadow-xl p-4 overflow-y-auto">
+          <div className="absolute inset-y-0 left-0 w-[min(18rem,85vw)] max-w-full bg-[var(--card)] shadow-xl p-4 overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
               <span className="font-semibold">Menu</span>
               <button onClick={closeMobile} aria-label="Close menu">
@@ -194,14 +193,14 @@ export default function AppLayout() {
         </div>
       )}
 
-      <main className="flex-1 lg:pl-60">
-        <div className="min-h-screen pt-14 lg:pt-0 pb-20 lg:pb-0">
+      <main className="flex-1 min-w-0 lg:pl-60">
+        <div className="min-h-screen max-w-full overflow-x-clip pt-14 lg:pt-0 pb-20 lg:pb-0">
           <Outlet />
         </div>
       </main>
 
       <nav
-        className="lg:hidden fixed bottom-0 inset-x-0 z-40 border-t border-[var(--border)] bg-[var(--card)]"
+        className="lg:hidden fixed bottom-0 inset-x-0 z-40 border-t border-[var(--border)] bg-[var(--card)] max-w-[100vw]"
         style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
       >
         <div className="flex justify-around py-2">
@@ -211,13 +210,13 @@ export default function AppLayout() {
               to={item.to}
               className={({ isActive }) =>
                 cn(
-                  'flex flex-col items-center gap-0.5 px-2 py-1 text-xs min-w-[3.25rem]',
+                  'flex flex-col items-center gap-0.5 px-1.5 py-1 text-[10px] sm:text-xs min-w-0 flex-1 max-w-[4.5rem]',
                   isActive ? 'text-[var(--accent-color)]' : 'text-[var(--muted-foreground)]'
                 )
               }
             >
-              <item.icon className="h-5 w-5" />
-              {item.label}
+              <item.icon className="h-5 w-5 shrink-0" />
+              <span className="truncate w-full text-center">{item.label}</span>
             </NavLink>
           ))}
         </div>

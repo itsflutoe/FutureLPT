@@ -57,11 +57,10 @@ export default function Progress() {
     );
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-6 sm:py-8 space-y-6">
+    <div className="mx-auto w-full max-w-4xl px-3 sm:px-4 py-6 sm:py-8 space-y-6 overflow-x-clip">
       <h1 className="text-2xl font-bold">Progress</h1>
 
-      {/* Review hub — mobile-friendly shortcuts */}
-      <div>
+      <div className="min-w-0">
         <h2 className="text-sm font-semibold text-[var(--muted-foreground)] mb-2 uppercase tracking-wide">
           Review
         </h2>
@@ -70,14 +69,14 @@ export default function Progress() {
             <Link
               key={item.to}
               to={item.to}
-              className="flex items-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--card)] p-3 hover:bg-[var(--muted)]/40 transition-colors"
+              className="flex items-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--card)] p-3 hover:bg-[var(--muted)]/40 transition-colors min-w-0"
             >
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--muted)] shrink-0">
                 <item.icon className="h-5 w-5 text-[var(--accent-color)]" />
               </div>
-              <div className="min-w-0 flex-1">
-                <div className="font-medium text-sm">{item.label}</div>
-                <div className="text-xs text-[var(--muted-foreground)]">{item.desc}</div>
+              <div className="min-w-0 flex-1 overflow-hidden">
+                <div className="font-medium text-sm truncate">{item.label}</div>
+                <div className="text-xs text-[var(--muted-foreground)] truncate">{item.desc}</div>
               </div>
               <ChevronRight className="h-4 w-4 text-[var(--muted-foreground)] shrink-0" />
             </Link>
@@ -85,34 +84,34 @@ export default function Progress() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <Card>
-          <CardContent className="p-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+        <Card className="min-w-0">
+          <CardContent className="p-3 sm:p-4">
             <div className="text-xs text-[var(--muted-foreground)]">Accuracy</div>
-            <div className="text-2xl font-bold">{formatPercent(stats.accuracy)}</div>
+            <div className="text-xl sm:text-2xl font-bold tabular-nums">{formatPercent(stats.accuracy)}</div>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="p-4">
+        <Card className="min-w-0">
+          <CardContent className="p-3 sm:p-4">
             <div className="text-xs text-[var(--muted-foreground)]">Answered</div>
-            <div className="text-2xl font-bold">{stats.questionsAnswered}</div>
+            <div className="text-xl sm:text-2xl font-bold tabular-nums">{stats.questionsAnswered}</div>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="p-4">
+        <Card className="min-w-0">
+          <CardContent className="p-3 sm:p-4">
             <div className="text-xs text-[var(--muted-foreground)]">Mocks</div>
-            <div className="text-2xl font-bold">{stats.mockExamsCompleted}</div>
+            <div className="text-xl sm:text-2xl font-bold tabular-nums">{stats.mockExamsCompleted}</div>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="p-4">
+        <Card className="min-w-0">
+          <CardContent className="p-3 sm:p-4">
             <div className="text-xs text-[var(--muted-foreground)]">Streak</div>
-            <div className="text-2xl font-bold">{profile?.current_streak || 0}</div>
+            <div className="text-xl sm:text-2xl font-bold tabular-nums">{profile?.current_streak || 0}</div>
           </CardContent>
         </Card>
       </div>
 
-      <Card>
+      <Card className="min-w-0 overflow-hidden">
         <CardHeader>
           <CardTitle className="text-base">By Subject</CardTitle>
         </CardHeader>
@@ -121,10 +120,10 @@ export default function Progress() {
             <p className="text-sm text-[var(--muted-foreground)]">No data yet.</p>
           ) : (
             Object.entries(subjects).map(([name, v]) => (
-              <div key={name}>
-                <div className="flex justify-between text-sm mb-1">
-                  <span className="truncate pr-2">{name}</span>
-                  <span className="shrink-0">
+              <div key={name} className="min-w-0">
+                <div className="flex justify-between gap-2 text-sm mb-1">
+                  <span className="truncate min-w-0">{name}</span>
+                  <span className="shrink-0 tabular-nums text-[var(--muted-foreground)]">
                     {formatPercent(v.accuracy)} · {v.total} Q
                   </span>
                 </div>
@@ -135,36 +134,37 @@ export default function Progress() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="min-w-0 overflow-hidden">
         <CardHeader>
           <CardTitle className="text-base">By Topic</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-2">
           {topics.length === 0 ? (
             <p className="text-sm text-[var(--muted-foreground)]">No topic data yet.</p>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-left text-[var(--muted-foreground)] border-b border-[var(--border)]">
-                    <th className="py-2 pr-4">Topic</th>
-                    <th className="py-2 pr-4">Subject</th>
-                    <th className="py-2 pr-4">Attempts</th>
-                    <th className="py-2">Accuracy</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {topics.map((t) => (
-                    <tr key={`${t.subject}-${t.topic}`} className="border-b border-[var(--border)]">
-                      <td className="py-2 pr-4">{t.topic}</td>
-                      <td className="py-2 pr-4">{t.subject}</td>
-                      <td className="py-2 pr-4">{t.attempts}</td>
-                      <td className="py-2 font-medium">{formatPercent(Number(t.accuracy))}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            /* Mobile-first stacked rows — no wide table */
+            topics.map((t) => (
+              <div
+                key={`${t.subject}-${t.topic}`}
+                className="rounded-xl border border-[var(--border)] p-3 min-w-0"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="font-medium text-sm break-words">{t.topic}</div>
+                    <div className="text-xs text-[var(--muted-foreground)] truncate">{t.subject}</div>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <div className="text-sm font-semibold tabular-nums">
+                      {formatPercent(Number(t.accuracy))}
+                    </div>
+                    <div className="text-xs text-[var(--muted-foreground)]">{t.attempts} tries</div>
+                  </div>
+                </div>
+                <div className="mt-2">
+                  <ProgressBar value={Number(t.accuracy)} />
+                </div>
+              </div>
+            ))
           )}
         </CardContent>
       </Card>
