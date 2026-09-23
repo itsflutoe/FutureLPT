@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { getAttempt, getAttemptAnswers } from '@/services/exams';
 import type { ExamAttempt, ExamAnswer, Question } from '@/types';
 import { formatPercent } from '@/lib/utils';
@@ -148,7 +148,6 @@ export default function Results() {
         </Card>
       </div>
 
-      {/* Sticky mobile CTAs */}
       <div className="fixed bottom-0 inset-x-0 z-20 border-t border-[var(--border)] bg-[var(--card)]/95 backdrop-blur p-3 sm:static sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-none">
         <div className="mx-auto max-w-3xl flex flex-col sm:flex-row gap-2 sm:justify-center">
           <Button className="w-full sm:w-auto min-h-11" onClick={() => navigate('/practice')}>

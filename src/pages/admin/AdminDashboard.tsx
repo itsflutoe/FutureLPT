@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import { getQuestionBankStats, categoryLabel } from '@/services/questionStats';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button';
 import { Spinner } from '@/components/ui/Spinner';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import {
@@ -80,7 +79,6 @@ export default function AdminDashboard() {
         </Card>
       </div>
 
-      {/* Mobile-friendly nav cards */}
       <div className="grid gap-2 sm:grid-cols-2">
         {adminLinks.map((item) => (
           <Link
