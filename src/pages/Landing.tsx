@@ -26,7 +26,7 @@ export default function Landing() {
 
       <section className="mx-auto max-w-6xl px-4 py-20 text-center">
         <h1 className="text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl">
-          Find. Learn. Pass. Teach.
+          Future LPT
         </h1>
         <p className="mx-auto mt-6 max-w-2xl text-lg text-[var(--muted-foreground)]">
           Your personal LET review companion for future educators.
@@ -66,7 +66,7 @@ export default function Landing() {
 
       <footer className="border-t border-[var(--border)] py-10">
         <div className="mx-auto max-w-6xl px-4 text-center text-sm text-[var(--muted-foreground)]">
-          <p className="font-medium text-[var(--foreground)]">FLPT — Find Learn Pass Teach</p>
+          <p className="font-medium text-[var(--foreground)]">FLPT — Future LPT</p>
           <p className="mt-2">Independent educational review platform.</p>
           <p className="mt-4 max-w-2xl mx-auto text-xs">
             FLPT is an independent educational review platform and is not affiliated with, endorsed by,
