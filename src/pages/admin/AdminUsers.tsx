@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import type { Profile } from '@/types';
+import { adminResetUserProgress, adminResetAllProgress } from '@/services/accountReset';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -18,6 +19,8 @@ export default function AdminUsers() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [resetting, setResetting] = useState(false);
+  const [resettingProgress, setResettingProgress] = useState(false);
+  const [resettingAll, setResettingAll] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -117,6 +120,49 @@ export default function AdminUsers() {
     }
   };
 
+  const resetUserProgress = async () => {
+    if (!managing) return;
+    setError('');
+    setStatus('');
+    const ok = window.confirm(
+      `Reset ALL progress for @${managing.username}?\n\nHistory, stats, streaks, bookmarks, and achievements will be cleared. Account login is kept.`
+    );
+    if (!ok) return;
+
+    setResettingProgress(true);
+    try {
+      await adminResetUserProgress(managing.id);
+      setStatus(`Progress reset for @${managing.username}.`);
+      await load();
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Progress reset failed');
+    } finally {
+      setResettingProgress(false);
+    }
+  };
+
+  const resetAllProgress = async () => {
+    setError('');
+    setStatus('');
+    const ok = window.confirm(
+      'Reset progress for ALL accounts?\n\nEvery user’s history, stats, streaks, bookmarks, and achievements will be cleared.\nAccounts and the question bank are NOT deleted.\n\nThis cannot be undone.'
+    );
+    if (!ok) return;
+    const ok2 = window.confirm(`Type-confirm: reset progress for all ${users.length}+ users?`);
+    if (!ok2) return;
+
+    setResettingAll(true);
+    try {
+      const n = await adminResetAllProgress();
+      setStatus(`Progress reset for ${n} user(s).`);
+      await load();
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Reset all failed');
+    } finally {
+      setResettingAll(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center py-32">
@@ -127,7 +173,17 @@ export default function AdminUsers() {
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-8 space-y-4">
-      <h1 className="text-2xl font-bold">Users</h1>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <h1 className="text-2xl font-bold">Users</h1>
+        <Button variant="danger" size="sm" disabled={resettingAll} onClick={resetAllProgress}>
+          {resettingAll ? 'Resetting all…' : 'Reset all progress'}
+        </Button>
+      </div>
+
+      <p className="text-xs text-[var(--muted-foreground)]">
+        “Reset all progress” clears study data for every account. It does not delete logins or the
+        question bank.
+      </p>
 
       {error && !managing && (
         <div className="rounded-xl bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 px-4 py-3 text-sm">
@@ -157,7 +213,7 @@ export default function AdminUsers() {
               <h3 className="text-sm font-medium">Reset Password</h3>
               <p className="text-xs text-[var(--muted-foreground)]">
                 Sets a new password in Supabase Auth. The user signs in with their username and this
-                new password. Do not store passwords in profiles.
+                new password.
               </p>
 
               {error && (
@@ -196,7 +252,14 @@ export default function AdminUsers() {
                 <Button onClick={resetPassword} disabled={resetting}>
                   {resetting ? 'Resetting…' : 'Reset Password'}
                 </Button>
-                <Button variant="outline" onClick={closeManage} disabled={resetting}>
+                <Button
+                  variant="danger"
+                  onClick={resetUserProgress}
+                  disabled={resettingProgress || resetting}
+                >
+                  {resettingProgress ? 'Resetting…' : 'Reset progress'}
+                </Button>
+                <Button variant="outline" onClick={closeManage} disabled={resetting || resettingProgress}>
                   Close
                 </Button>
               </div>
@@ -209,7 +272,7 @@ export default function AdminUsers() {
         {users.map((u) => (
           <Card key={u.id}>
             <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-              <div>
+              <div className="min-w-0">
                 <div className="font-medium text-sm">
                   {u.display_name}{' '}
                   <span className="text-[var(--muted-foreground)]">@{u.username}</span>
