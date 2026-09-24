@@ -1,0 +1,31 @@
+-- Expand FLPT achievements catalog (idempotent by code)
+INSERT INTO public.achievements (code, title, description, icon, threshold) VALUES
+  ('review_warrior', 'Review Warrior', 'Answer 50 questions in a single day.', 'swords', 50),
+  ('midnight_scholar', 'Midnight Scholar', 'Complete a session between 12:00 and 4:00 AM.', 'moon', NULL),
+  ('early_bird_educator', 'Early Bird Educator', 'Complete a session before 7:00 AM.', 'sunrise', NULL),
+  ('almost_perfect', 'So Close', 'Score 90–99% on a mock exam.', 'target', 90),
+  ('comeback_kid', 'Comeback Kid', 'Raise your recent accuracy by at least 10 points versus your earlier answers.', 'trending-up', 10),
+  ('mistake_collector', 'Learning from Scars', 'Accumulate 25 incorrect answers to review (mistakes happen).', 'bandage', 25),
+  ('bookmark_hoarder', 'Flag Collector', 'Bookmark 20 questions.', 'bookmark', 20),
+  ('topic_hopper', 'Subject Hopper', 'Practice 5 different subjects within 7 days.', 'shuffle', 5),
+  ('mock_survivor', 'Mock Survivor', 'Finish a timed mock exam end-to-end.', 'shield', 1),
+  ('daily_devotee', 'Daily Devotee', 'Complete the Daily LET Challenge 7 times.', 'calendar-check', 7),
+  ('no_skip_zone', 'No Skip Zone', 'Complete a session of 20+ questions with every item answered.', 'check-check', 20),
+  ('board_exam_energy', 'Board Exam Energy', 'Complete 3 mock exams in one week.', 'zap', 3),
+  ('lesson_plan_mode', 'Lesson Plan Mode', 'Practice the same topic in 3 separate sessions.', 'book-open', 3),
+  ('faculty_room_regular', 'Faculty Room Regular', 'Maintain a 14-day study streak.', 'coffee', 14),
+  ('practicum_ready', 'Practicum Ready', 'Answer 200 questions.', 'graduation-cap', 200),
+  ('code_of_ethics_enjoyer', 'Code of Ethics Enjoyer', 'Get 30 correct answers in Professional Education.', 'scale', 30),
+  ('century_club', 'Century Club', 'Get 100 answers correct.', 'medal', 100),
+  ('iron_reviewer', 'Iron Reviewer', 'Maintain a 30-day study streak.', 'flame', 30),
+  ('mock_specialist', 'Mock Specialist', 'Average at least 75% across 5 completed mocks.', 'award', 75),
+  ('gened_anchor', 'GenEd Anchor', 'Reach 80%+ accuracy with at least 50 General Education answers.', 'anchor', 50),
+  ('profed_anchor', 'ProfEd Anchor', 'Reach 80%+ accuracy with at least 50 Professional Education answers.', 'anchor', 50),
+  ('balanced_educator', 'Balanced Educator', 'Practice both GenEd and ProfEd on the same day, five different days.', 'scale-3d', 5),
+  ('weak_spot_hunter', 'Weak Spot Hunter', 'Bring a weak topic (under 50%) up to at least 70% accuracy.', 'crosshair', 70),
+  ('exam_day_calm', 'Exam Day Calm', 'Finish a timed mock with time still remaining.', 'timer', NULL)
+ON CONFLICT (code) DO UPDATE SET
+  title = EXCLUDED.title,
+  description = EXCLUDED.description,
+  icon = EXCLUDED.icon,
+  threshold = EXCLUDED.threshold;

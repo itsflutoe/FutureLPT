@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
-import { getUserAchievements, getAllAchievements } from '@/services/achievements';
+import { getUserAchievements, getAllAchievements, checkAchievements } from '@/services/achievements';
 import type { Achievement, UserAchievement } from '@/types';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
@@ -16,32 +16,57 @@ export default function Achievements() {
 
   useEffect(() => {
     if (!user) return;
-    Promise.all([getAllAchievements(), getUserAchievements(user.id)])
-      .then(([a, e]) => { setAll(a); setEarned(e); })
-      .finally(() => setLoading(false));
+    (async () => {
+      try {
+        // Re-check in case new badges were added after older sessions
+        await checkAchievements(user.id);
+        const [a, e] = await Promise.all([getAllAchievements(), getUserAchievements(user.id)]);
+        setAll(a);
+        setEarned(e);
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, [user]);
 
-  if (loading) return <div className="flex justify-center py-32"><Spinner /></div>;
+  if (loading)
+    return (
+      <div className="flex justify-center py-32">
+        <Spinner />
+      </div>
+    );
 
   const earnedIds = new Set(earned.map((e) => e.achievement_id));
+  const earnedCount = earnedIds.size;
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-8">
-      <h1 className="text-2xl font-bold mb-2 flex items-center gap-2"><Trophy className="h-6 w-6 text-[var(--accent-color)]" /> Achievements</h1>
-      <p className="text-[var(--muted-foreground)] mb-6">Light milestones to celebrate consistent progress.</p>
+    <div className="mx-auto max-w-3xl px-4 py-8 overflow-x-clip">
+      <h1 className="text-2xl font-bold mb-2 flex items-center gap-2">
+        <Trophy className="h-6 w-6 text-[var(--accent-color)]" /> Achievements
+      </h1>
+      <p className="text-[var(--muted-foreground)] mb-1">
+        Light milestones for consistent LET prep — funny and serious.
+      </p>
+      <p className="text-sm text-[var(--muted-foreground)] mb-6">
+        {earnedCount} / {all.length} unlocked
+      </p>
       <div className="grid gap-3 sm:grid-cols-2">
         {all.map((a) => {
           const isEarned = earnedIds.has(a.id);
           const ua = earned.find((e) => e.achievement_id === a.id);
           return (
-            <Card key={a.id} className={isEarned ? '' : 'opacity-60'}>
+            <Card key={a.id} className={isEarned ? '' : 'opacity-55'}>
               <CardContent className="p-4">
-                <div className="flex items-start justify-between">
-                  <div>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
                     <h3 className="font-semibold text-sm">{a.title}</h3>
                     <p className="text-xs text-[var(--muted-foreground)] mt-1">{a.description}</p>
                   </div>
-                  {isEarned ? <Badge variant="success">Earned</Badge> : <Badge variant="outline">Locked</Badge>}
+                  {isEarned ? (
+                    <Badge variant="success">Earned</Badge>
+                  ) : (
+                    <Badge variant="outline">Locked</Badge>
+                  )}
                 </div>
                 {ua && (
                   <p className="text-xs text-[var(--muted-foreground)] mt-2">
