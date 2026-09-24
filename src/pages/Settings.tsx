@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useTheme } from '@/hooks/useTheme';
 import { supabase } from '@/lib/supabase';
@@ -16,47 +16,84 @@ export default function Settings() {
   const [newPassword, setNewPassword] = useState('');
   const [msg, setMsg] = useState('');
   const [err, setErr] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [changingPw, setChangingPw] = useState(false);
+
+  useEffect(() => {
+    if (profile?.display_name) setDisplayName(profile.display_name);
+  }, [profile?.display_name]);
 
   const saveProfile = async () => {
     if (!user) return;
     setErr('');
+    setMsg('');
+    setSaving(true);
     try {
-      await supabase.from('profiles').update({ display_name: displayName }).eq('id', user.id);
+      const { error } = await supabase
+        .from('profiles')
+        .update({ display_name: displayName.trim() })
+        .eq('id', user.id);
+      if (error) throw error;
       await refreshProfile();
       setMsg('Profile updated.');
     } catch (e: unknown) {
       setErr(e instanceof Error ? e.message : 'Update failed');
+    } finally {
+      setSaving(false);
     }
   };
 
   const changePassword = async () => {
     setErr('');
+    setMsg('');
+    if (newPassword.length < 6) {
+      setErr('Password must be at least 6 characters.');
+      return;
+    }
+    setChangingPw(true);
     try {
       await updatePassword(newPassword);
       setMsg('Password updated.');
       setNewPassword('');
     } catch (e: unknown) {
       setErr(e instanceof Error ? e.message : 'Password change failed');
+    } finally {
+      setChangingPw(false);
     }
   };
 
   return (
-    <div className="mx-auto max-w-2xl px-4 py-8 space-y-6">
+    <div className="mx-auto max-w-2xl px-4 py-8 space-y-6 overflow-x-clip">
       <h1 className="text-2xl font-bold">Settings</h1>
-      {msg && <div className="rounded-xl bg-green-50 text-green-700 px-4 py-3 text-sm">{msg}</div>}
-      {err && <div className="rounded-xl bg-red-50 text-red-700 px-4 py-3 text-sm">{err}</div>}
+      {msg && (
+        <div className="rounded-xl bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 px-4 py-3 text-sm">
+          {msg}
+        </div>
+      )}
+      {err && (
+        <div className="rounded-xl bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 px-4 py-3 text-sm">
+          {err}
+        </div>
+      )}
 
       <Card>
-        <CardHeader><CardTitle className="text-base">Appearance</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle className="text-base">Appearance</CardTitle>
+        </CardHeader>
         <CardContent className="space-y-4">
           <div>
             <label className="text-sm font-medium mb-2 block">Theme</label>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               {(['system', 'light', 'dark'] as ThemeMode[]).map((t) => (
                 <button
                   key={t}
+                  type="button"
                   onClick={() => setTheme(t)}
-                  className={`rounded-lg border px-3 py-1.5 text-sm capitalize ${theme === t ? 'border-[var(--accent-color)] bg-[var(--accent-color)]/10' : 'border-[var(--border)]'}`}
+                  className={`rounded-lg border px-3 py-1.5 text-sm capitalize min-h-9 ${
+                    theme === t
+                      ? 'border-[var(--accent-color)] bg-[var(--accent-color)]/10'
+                      : 'border-[var(--border)]'
+                  }`}
                 >
                   {t}
                 </button>
@@ -69,8 +106,9 @@ export default function Settings() {
               {(Object.keys(ACCENT_COLORS) as AccentColor[]).map((c) => (
                 <button
                   key={c}
+                  type="button"
                   onClick={() => setAccent(c)}
-                  className={`h-8 w-8 rounded-full border-2 ${accent === c ? 'border-[var(--foreground)]' : 'border-transparent'}`}
+                  className={`h-9 w-9 rounded-full border-2 ${accent === c ? 'border-[var(--foreground)]' : 'border-transparent'}`}
                   style={{ backgroundColor: ACCENT_COLORS[c] }}
                   aria-label={c}
                 />
@@ -81,7 +119,9 @@ export default function Settings() {
       </Card>
 
       <Card>
-        <CardHeader><CardTitle className="text-base">Account</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle className="text-base">Account</CardTitle>
+        </CardHeader>
         <CardContent className="space-y-4">
           <div>
             <label className="text-sm font-medium mb-1.5 block">Display name</label>
@@ -91,15 +131,28 @@ export default function Settings() {
             <label className="text-sm font-medium mb-1.5 block">Username</label>
             <Input value={profile?.username || ''} disabled />
           </div>
-          <Button onClick={saveProfile}>Save profile</Button>
+          <Button onClick={saveProfile} disabled={saving || !displayName.trim()}>
+            {saving ? 'Saving…' : 'Save profile'}
+          </Button>
         </CardContent>
       </Card>
 
       <Card>
-        <CardHeader><CardTitle className="text-base">Change password</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle className="text-base">Change password</CardTitle>
+        </CardHeader>
         <CardContent className="space-y-4">
-          <Input type="password" placeholder="New password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} minLength={6} />
-          <Button onClick={changePassword} disabled={newPassword.length < 6}>Update password</Button>
+          <Input
+            type="password"
+            placeholder="New password"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+            minLength={6}
+            autoComplete="new-password"
+          />
+          <Button onClick={changePassword} disabled={changingPw || newPassword.length < 6}>
+            {changingPw ? 'Updating…' : 'Update password'}
+          </Button>
         </CardContent>
       </Card>
     </div>

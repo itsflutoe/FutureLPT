@@ -9,6 +9,8 @@ interface AuthContextType {
   profile: Profile | null;
   settings: UserSettings | null;
   loading: boolean;
+  /** True until the first profile fetch for the current user finishes */
+  profileLoading: boolean;
   refreshProfile: () => Promise<void>;
   refreshSettings: () => Promise<void>;
 }
@@ -21,10 +23,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [loading, setLoading] = useState(true);
+  const [profileLoading, setProfileLoading] = useState(true);
 
   const fetchProfile = async (userId: string) => {
-    const { data } = await supabase.from('profiles').select('*').eq('id', userId).single();
-    setProfile(data as Profile | null);
+    setProfileLoading(true);
+    try {
+      const { data } = await supabase.from('profiles').select('*').eq('id', userId).single();
+      setProfile(data as Profile | null);
+    } finally {
+      setProfileLoading(false);
+    }
   };
 
   const fetchSettings = async (userId: string) => {
@@ -47,11 +55,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (session?.user) {
         fetchProfile(session.user.id);
         fetchSettings(session.user.id);
+      } else {
+        setProfile(null);
+        setSettings(null);
+        setProfileLoading(false);
       }
       setLoading(false);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
@@ -60,6 +74,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else {
         setProfile(null);
         setSettings(null);
+        setProfileLoading(false);
       }
       setLoading(false);
     });
@@ -68,7 +83,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ session, user, profile, settings, loading, refreshProfile, refreshSettings }}>
+    <AuthContext.Provider
+      value={{
+        session,
+        user,
+        profile,
+        settings,
+        loading,
+        profileLoading,
+        refreshProfile,
+        refreshSettings,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
