@@ -50,16 +50,22 @@ export async function saveAnswer(
   attemptId: string,
   questionId: string,
   selected: 'A' | 'B' | 'C' | 'D' | null,
-  isFlagged = false
+  isFlagged = false,
+  /** Prefer client-known correct answer to skip an extra SELECT */
+  knownCorrect?: 'A' | 'B' | 'C' | 'D'
 ) {
-  const { data: ans } = await supabase
-    .from('exam_answers')
-    .select('correct_answer')
-    .eq('attempt_id', attemptId)
-    .eq('question_id', questionId)
-    .single();
+  let correctAnswer = knownCorrect;
+  if (!correctAnswer) {
+    const { data: ans } = await supabase
+      .from('exam_answers')
+      .select('correct_answer')
+      .eq('attempt_id', attemptId)
+      .eq('question_id', questionId)
+      .single();
+    correctAnswer = ans?.correct_answer as 'A' | 'B' | 'C' | 'D' | undefined;
+  }
 
-  const isCorrect = selected && ans ? selected === ans.correct_answer : null;
+  const isCorrect = selected && correctAnswer ? selected === correctAnswer : null;
 
   const { error } = await supabase
     .from('exam_answers')
@@ -76,6 +82,10 @@ export async function saveAnswer(
   return { isCorrect };
 }
 
+/**
+ * Score + mark attempt complete, then return immediately.
+ * Stats / streak / achievements run in the background so Results opens fast.
+ */
 export async function completeAttempt(
   attemptId: string,
   userId: string,
@@ -113,24 +123,30 @@ export async function completeAttempt(
 
   if (updError) throw updError;
 
-  const isDaily = !!(attempt as ExamAttempt).is_daily_challenge;
+  const typedAttempt = attempt as ExamAttempt;
+  const isDaily = !!typedAttempt.is_daily_challenge;
 
-  // Critical path only — keep submit fast
-  await updateStatsAfterAttempt(userId, typedAnswers);
-  await recordActivity(userId, {
-    questionsAnswered: total,
-    isPractice: attempt.mode === 'practice',
-    isMock: attempt.mode === 'mock',
-    dailyChallenge: isDaily,
-  });
-
-  // Achievements are heavy; do not block navigation / Results
-  void checkAchievements(userId).catch((e) => console.error('checkAchievements', e));
+  // Background: progress + streak + achievements (do not block Results navigation)
+  void (async () => {
+    try {
+      await updateStatsAfterAttempt(userId, typedAnswers);
+      await recordActivity(userId, {
+        questionsAnswered: total,
+        isPractice: typedAttempt.mode === 'practice',
+        isMock: typedAttempt.mode === 'mock',
+        dailyChallenge: isDaily,
+      });
+      await checkAchievements(userId);
+    } catch (e) {
+      console.error('post-submit progress', e);
+    }
+  })();
 
   const bySubject: Record<string, { correct: number; total: number; accuracy: number }> = {};
   const byTopic: Record<string, { correct: number; total: number; accuracy: number }> = {};
 
   for (const a of typedAnswers) {
+    if (!a.question) continue;
     const subj = a.question.subject;
     const top = a.question.topic;
     if (!bySubject[subj]) bySubject[subj] = { correct: 0, total: 0, accuracy: 0 };
@@ -152,10 +168,13 @@ export async function completeAttempt(
 
   const sortedSubjects = Object.entries(bySubject).sort((a, b) => b[1].accuracy - a[1].accuracy);
   const strongest = sortedSubjects.filter(([, v]) => v.accuracy >= 75).slice(0, 3).map(([k]) => k);
-  const needsImprovement = sortedSubjects.filter(([, v]) => v.accuracy < 70).slice(0, 3).map(([k]) => k);
+  const needsImprovement = sortedSubjects
+    .filter(([, v]) => v.accuracy < 70)
+    .slice(0, 3)
+    .map(([k]) => k);
 
   return {
-    attempt: attempt as ExamAttempt,
+    attempt: typedAttempt,
     answers: typedAnswers,
     bySubject,
     byTopic,
@@ -216,7 +235,6 @@ export async function startPractice(userId: string, config: PracticeConfig) {
   return { attempt, questions };
 }
 
-/** 10 mixed questions, practice mode, flagged as daily challenge. */
 export async function startDailyChallenge(userId: string) {
   return startPractice(userId, {
     category: 'MIXED',

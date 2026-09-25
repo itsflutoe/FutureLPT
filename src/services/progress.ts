@@ -2,60 +2,109 @@ import { supabase } from '@/lib/supabase';
 import type { ExamAnswer, Question, UserTopicStat } from '@/types';
 import { calculateMastery } from '@/lib/utils';
 
+/**
+ * Apply question + topic stats after an attempt.
+ * Uses 2 reads + 2 batch upserts instead of ~4 sequential calls per question.
+ */
 export async function updateStatsAfterAttempt(
   userId: string,
   answers: (ExamAnswer & { question: Question })[]
 ) {
-  for (const a of answers) {
-    if (a.selected_answer == null) continue;
+  const answered = answers.filter((a) => a.selected_answer != null && a.question);
+  if (answered.length === 0) return;
 
-    // Question-level stats
-    const { data: existing } = await supabase
+  const qids = [...new Set(answered.map((a) => a.question_id))];
+
+  const [{ data: existingQ }, { data: existingTopics }] = await Promise.all([
+    supabase
       .from('user_question_stats')
-      .select('*')
+      .select('question_id, attempts, correct_count')
       .eq('user_id', userId)
-      .eq('question_id', a.question_id)
-      .maybeSingle();
+      .in('question_id', qids),
+    supabase
+      .from('user_topic_stats')
+      .select('category, subject, topic, attempts, correct_count')
+      .eq('user_id', userId),
+  ]);
 
-    const attempts = (existing?.attempts || 0) + 1;
-    const correctCount = (existing?.correct_count || 0) + (a.is_correct ? 1 : 0);
-    const mastery = calculateMastery(attempts, correctCount);
+  const qMap = new Map(
+    (existingQ || []).map((r) => [r.question_id as string, r as { attempts: number; correct_count: number }])
+  );
+  const tMap = new Map(
+    (existingTopics || []).map((r) => [
+      `${r.category}::${r.subject}::${r.topic}`,
+      r as { attempts: number; correct_count: number },
+    ])
+  );
 
-    await supabase.from('user_question_stats').upsert({
+  const now = new Date().toISOString();
+
+  // One row per question answered in this attempt
+  const qUpserts = answered.map((a) => {
+    const ex = qMap.get(a.question_id);
+    const attempts = (ex?.attempts || 0) + 1;
+    const correctCount = (ex?.correct_count || 0) + (a.is_correct ? 1 : 0);
+    return {
       user_id: userId,
       question_id: a.question_id,
       attempts,
       correct_count: correctCount,
-      last_attempted_at: new Date().toISOString(),
-      mastery_status: mastery,
-    });
+      last_attempted_at: now,
+      mastery_status: calculateMastery(attempts, correctCount),
+    };
+  });
 
-    // Topic-level stats
+  // Aggregate topic deltas (multiple Qs can share a topic)
+  const topicDeltas = new Map<
+    string,
+    { category: string; subject: string; topic: string; addAttempts: number; addCorrect: number }
+  >();
+  for (const a of answered) {
     const q = a.question;
-    const { data: topicStat } = await supabase
-      .from('user_topic_stats')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('category', q.category)
-      .eq('subject', q.subject)
-      .eq('topic', q.topic)
-      .maybeSingle();
-
-    const tAttempts = (topicStat?.attempts || 0) + 1;
-    const tCorrect = (topicStat?.correct_count || 0) + (a.is_correct ? 1 : 0);
-    const accuracy = (tCorrect / tAttempts) * 100;
-
-    await supabase.from('user_topic_stats').upsert({
-      user_id: userId,
+    const key = `${q.category}::${q.subject}::${q.topic}`;
+    const d = topicDeltas.get(key) || {
       category: q.category,
       subject: q.subject,
       topic: q.topic,
-      attempts: tAttempts,
-      correct_count: tCorrect,
-      accuracy,
-      last_practiced_at: new Date().toISOString(),
-    });
+      addAttempts: 0,
+      addCorrect: 0,
+    };
+    d.addAttempts += 1;
+    if (a.is_correct) d.addCorrect += 1;
+    topicDeltas.set(key, d);
   }
+
+  const tUpserts = [...topicDeltas.values()].map((d) => {
+    const key = `${d.category}::${d.subject}::${d.topic}`;
+    const ex = tMap.get(key);
+    const attempts = (ex?.attempts || 0) + d.addAttempts;
+    const correctCount = (ex?.correct_count || 0) + d.addCorrect;
+    return {
+      user_id: userId,
+      category: d.category,
+      subject: d.subject,
+      topic: d.topic,
+      attempts,
+      correct_count: correctCount,
+      accuracy: attempts > 0 ? (correctCount / attempts) * 100 : 0,
+      last_practiced_at: now,
+    };
+  });
+
+  // Two batch writes (not N sequential)
+  const [qRes, tRes] = await Promise.all([
+    supabase.from('user_question_stats').upsert(qUpserts, {
+      onConflict: 'user_id,question_id',
+    }),
+    tUpserts.length
+      ? supabase.from('user_topic_stats').upsert(tUpserts, {
+          onConflict: 'user_id,category,subject,topic',
+        })
+      : Promise.resolve({ error: null }),
+  ]);
+
+  if (qRes.error) throw qRes.error;
+  if (tRes && 'error' in tRes && tRes.error) throw tRes.error;
 }
 
 export async function getOverallStats(userId: string) {
@@ -114,7 +163,6 @@ export async function getRecommendations(userId: string) {
 }
 
 export async function getMistakes(userId: string, limit = 50) {
-  // Questions the user got wrong most recently / frequently
   const { data: stats } = await supabase
     .from('user_question_stats')
     .select('*, question:questions(*)')
@@ -131,7 +179,10 @@ export async function getMistakes(userId: string, limit = 50) {
 
 export async function getSubjectPerformance(userId: string) {
   const stats = await getTopicStats(userId);
-  const bySubject: Record<string, { category: string; correct: number; total: number; accuracy: number }> = {};
+  const bySubject: Record<
+    string,
+    { category: string; correct: number; total: number; accuracy: number }
+  > = {};
 
   for (const s of stats) {
     const key = s.subject;

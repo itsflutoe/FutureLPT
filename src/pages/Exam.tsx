@@ -83,7 +83,6 @@ export default function Exam() {
   const q = questions[current];
   const answeredCount = questions.filter((qq) => !!answers[qq.id]?.selected_answer).length;
   const unansweredCount = questions.length - answeredCount;
-  /** Practice + feedback open: under-rationale Next is primary; hide bottom nav pair */
   const hideBottomNav = !!isPractice && showFeedback;
 
   useEffect(() => {
@@ -97,7 +96,7 @@ export default function Exam() {
   const handleSelect = async (opt: 'A' | 'B' | 'C' | 'D') => {
     if (!q || !attemptId || (showFeedback && isPractice)) return;
     setSelected(opt);
-    await saveAnswer(attemptId, q.id, opt, flagged.has(q.id));
+    // Optimistic UI — show feedback immediately in practice
     setAnswers((prev) => ({
       ...prev,
       [q.id]: {
@@ -108,6 +107,8 @@ export default function Exam() {
       },
     }));
     if (isPractice) setShowFeedback(true);
+    // Persist with known correct answer (skips extra SELECT)
+    void saveAnswer(attemptId, q.id, opt, flagged.has(q.id), q.correct_answer).catch(console.error);
   };
 
   const toggleFlag = async () => {
@@ -116,7 +117,7 @@ export default function Exam() {
     if (next.has(q.id)) next.delete(q.id);
     else next.add(q.id);
     setFlagged(next);
-    await saveAnswer(attemptId, q.id, selected, next.has(q.id));
+    void saveAnswer(attemptId, q.id, selected, next.has(q.id), q.correct_answer).catch(console.error);
   };
 
   const toggleBookmark = async () => {
@@ -150,6 +151,7 @@ export default function Exam() {
       setSubmitting(true);
       try {
         const timeUsed = Math.floor((Date.now() - startTime.current) / 1000);
+        // Scores attempt quickly; stats/streaks run in background
         await completeAttempt(attemptId, user.id, timeUsed);
         sessionStorage.removeItem(`exam_${attemptId}`);
         navigate(`/results/${attemptId}`);
@@ -324,7 +326,6 @@ export default function Exam() {
         )}
       </div>
 
-      {/* Number strip always; Prev/Next only when not in practice-feedback */}
       <footer
         className="fixed bottom-0 inset-x-0 z-20 border-t border-[var(--border)] bg-[var(--card)]/95 backdrop-blur px-3 pt-2"
         style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
