@@ -43,9 +43,7 @@ export default function Exam() {
           setTimeLeft(Math.max(0, att.time_limit_seconds - elapsed));
         }
         const cached = sessionStorage.getItem(`exam_${attemptId}`);
-        if (cached) {
-          setQuestions(JSON.parse(cached));
-        }
+        if (cached) setQuestions(JSON.parse(cached));
         const ansList = await getAttemptAnswers(attemptId);
         const map: Record<string, ExamAnswer> = {};
         const flags = new Set<string>();
@@ -85,15 +83,15 @@ export default function Exam() {
   const q = questions[current];
   const answeredCount = questions.filter((qq) => !!answers[qq.id]?.selected_answer).length;
   const unansweredCount = questions.length - answeredCount;
+  /** Practice + feedback open: under-rationale Next is primary; hide bottom nav pair */
+  const hideBottomNav = !!isPractice && showFeedback;
 
   useEffect(() => {
     if (!q) return;
     const ans = answers[q.id];
     setSelected(ans?.selected_answer || null);
     setShowFeedback(!!isPractice && !!ans?.selected_answer);
-    if (user) {
-      isBookmarked(user.id, q.id).then(setBookmarked);
-    }
+    if (user) isBookmarked(user.id, q.id).then(setBookmarked);
   }, [current, q, answers, isPractice, user]);
 
   const handleSelect = async (opt: 'A' | 'B' | 'C' | 'D') => {
@@ -132,17 +130,23 @@ export default function Exam() {
     }
   };
 
+  const goNext = () => {
+    if (isPractice && !answers[questions[current]?.id]?.selected_answer) {
+      window.alert('Pick an answer before moving on.');
+      return;
+    }
+    setCurrent((c) => Math.min(questions.length - 1, c + 1));
+  };
+
   const handleSubmit = useCallback(
     async (fromTimer = false) => {
       if (!attemptId || !user || submitting) return;
-
       if (!fromTimer && unansweredCount > 0) {
         const ok = window.confirm(
           `You still have ${unansweredCount} unanswered question${unansweredCount === 1 ? '' : 's'}.\n\nSubmit anyway?`
         );
         if (!ok) return;
       }
-
       setSubmitting(true);
       try {
         const timeUsed = Math.floor((Date.now() - startTime.current) / 1000);
@@ -160,7 +164,7 @@ export default function Exam() {
   const handleExit = () => {
     if (
       window.confirm(
-        'Leave this session? Answers so far are saved. Finish later from a new session — incomplete runs are not listed as results until you submit.'
+        'Leave this session? Answers so far are saved. Incomplete runs appear in results only after you submit.'
       )
     ) {
       navigate('/dashboard');
@@ -237,7 +241,7 @@ export default function Exam() {
         </div>
       </header>
 
-      <div className="flex-1 px-4 py-4 pb-40">
+      <div className={`flex-1 px-4 py-4 ${hideBottomNav ? 'pb-8' : 'pb-40'}`}>
         <div className="mb-2 flex flex-wrap gap-2">
           <Badge variant="outline">{q.subject}</Badge>
           <Badge variant="outline">{q.difficulty.toLowerCase()}</Badge>
@@ -249,7 +253,6 @@ export default function Exam() {
           {options.map((opt) => {
             let style =
               'border-[var(--border)] text-[var(--foreground)] hover:border-[var(--accent-color)]/50';
-
             if (selected === opt.key) {
               if (isPractice && showFeedback) {
                 style =
@@ -264,7 +267,6 @@ export default function Exam() {
               style =
                 'border-green-600 bg-green-100 text-green-950 dark:bg-green-950 dark:text-green-50 dark:border-green-500';
             }
-
             return (
               <button
                 key={opt.key}
@@ -305,18 +307,24 @@ export default function Exam() {
             {q.reference && (
               <p className="text-xs text-[var(--muted-foreground)] mt-2">Reference: {q.reference}</p>
             )}
-            {current < questions.length - 1 && (
-              <Button
-                className="w-full mt-4 min-h-11"
-                onClick={() => setCurrent((c) => c + 1)}
-              >
+            {current < questions.length - 1 ? (
+              <Button className="w-full mt-4 min-h-12" onClick={goNext}>
                 Next question
+              </Button>
+            ) : (
+              <Button
+                className="w-full mt-4 min-h-12"
+                onClick={() => handleSubmit(false)}
+                disabled={submitting}
+              >
+                {submitting ? 'Submitting…' : 'Submit session'}
               </Button>
             )}
           </div>
         )}
       </div>
 
+      {/* Number strip always; Prev/Next only when not in practice-feedback */}
       <footer
         className="fixed bottom-0 inset-x-0 z-20 border-t border-[var(--border)] bg-[var(--card)]/95 backdrop-blur px-3 pt-2"
         style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
@@ -334,7 +342,13 @@ export default function Exam() {
                 <button
                   key={qq.id}
                   type="button"
-                  onClick={() => setCurrent(i)}
+                  onClick={() => {
+                    if (isPractice && i > current && !answers[questions[current]?.id]?.selected_answer) {
+                      window.alert('Pick an answer before jumping ahead.');
+                      return;
+                    }
+                    setCurrent(i);
+                  }}
                   className={`h-9 w-9 shrink-0 rounded-lg text-xs font-medium ${cls}`}
                   aria-label={`Question ${i + 1}`}
                 >
@@ -343,32 +357,31 @@ export default function Exam() {
               );
             })}
           </div>
-          <div className="flex items-center justify-between gap-3">
-            <Button
-              variant="outline"
-              onClick={() => setCurrent((c) => Math.max(0, c - 1))}
-              disabled={current === 0}
-              className="gap-1 min-h-11 flex-1 sm:flex-none"
-            >
-              <ChevronLeft className="h-4 w-4" /> Prev
-            </Button>
-            {current < questions.length - 1 ? (
+          {!hideBottomNav && (
+            <div className="flex items-center justify-between gap-3">
               <Button
-                onClick={() => setCurrent((c) => c + 1)}
+                variant="outline"
+                onClick={() => setCurrent((c) => Math.max(0, c - 1))}
+                disabled={current === 0}
                 className="gap-1 min-h-11 flex-1 sm:flex-none"
               >
-                Next <ChevronRight className="h-4 w-4" />
+                <ChevronLeft className="h-4 w-4" /> Prev
               </Button>
-            ) : (
-              <Button
-                onClick={() => handleSubmit(false)}
-                disabled={submitting}
-                className="min-h-11 flex-1 sm:flex-none"
-              >
-                {submitting ? 'Submitting…' : 'Submit'}
-              </Button>
-            )}
-          </div>
+              {current < questions.length - 1 ? (
+                <Button onClick={goNext} className="gap-1 min-h-11 flex-1 sm:flex-none">
+                  Next <ChevronRight className="h-4 w-4" />
+                </Button>
+              ) : (
+                <Button
+                  onClick={() => handleSubmit(false)}
+                  disabled={submitting}
+                  className="min-h-11 flex-1 sm:flex-none"
+                >
+                  {submitting ? 'Submitting…' : 'Submit'}
+                </Button>
+              )}
+            </div>
+          )}
         </div>
       </footer>
     </div>

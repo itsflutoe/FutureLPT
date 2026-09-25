@@ -8,11 +8,40 @@ function hourLocal(iso: string | null | undefined): number | null {
   return d.getHours();
 }
 
-function dateKey(iso: string | null | undefined): string | null {
-  if (!iso) return null;
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return null;
-  return d.toISOString().slice(0, 10);
+function subjectBucket(subject: string | undefined | null): string | null {
+  if (!subject) return null;
+  const s = subject.toLowerCase();
+  if (s.includes('science') || s.includes('technology')) return 'science';
+  if (s.includes('math')) return 'math';
+  if (s.includes('english') || s.includes('communication') || s.includes('filipino') || s.includes('purposive'))
+    return 'comms';
+  if (s.includes('history') || s.includes('rizal') || s.includes('kasaysayan') || s.includes('social'))
+    return 'history';
+  return null;
+}
+
+/** Max consecutive correct within a single attempt (by answered_at). */
+async function maxCorrectStreakInAttempts(attemptIds: string[]): Promise<number> {
+  if (!attemptIds.length) return 0;
+  let best = 0;
+  for (const id of attemptIds.slice(0, 15)) {
+    const { data } = await supabase
+      .from('exam_answers')
+      .select('is_correct, answered_at')
+      .eq('attempt_id', id)
+      .not('selected_answer', 'is', null)
+      .order('answered_at', { ascending: true });
+    let run = 0;
+    for (const row of data || []) {
+      if (row.is_correct) {
+        run++;
+        if (run > best) best = run;
+      } else {
+        run = 0;
+      }
+    }
+  }
+  return best;
 }
 
 export async function checkAchievements(userId: string) {
@@ -38,57 +67,93 @@ export async function checkAchievements(userId: string) {
   const totalCorrect = completed.reduce((s, a) => s + (a.correct_count || 0), 0);
   const mocks = completed.filter((a) => a.mode === 'mock');
   const practices = completed.filter((a) => a.mode === 'practice');
-  const perfect = completed.some((a) => Number(a.score_percent) === 100 && (a.total_questions || 0) >= 10);
-  const almostPerfectMock = mocks.some((a) => {
-    const p = Number(a.score_percent);
-    return p >= 90 && p < 100;
-  });
-  const mockSurvivor = mocks.some((a) => (a.time_limit_seconds || 0) > 0);
-  const examDayCalm = mocks.some(
+
+  const perfect = completed.some(
+    (a) => Number(a.score_percent) === 100 && (a.total_questions || 0) >= 5
+  );
+  const academicDamage = completed.some(
+    (a) => Number(a.score_percent) >= 90 && (a.total_questions || 0) >= 10
+  );
+  const speedDemon = mocks.some(
     (a) =>
       (a.time_limit_seconds || 0) > 0 &&
       a.time_used_seconds != null &&
-      a.time_used_seconds < a.time_limit_seconds
+      a.time_used_seconds <= a.time_limit_seconds * 0.6 &&
+      Number(a.score_percent) >= 70
   );
-  const dailyCount = completed.filter((a) => a.is_daily_challenge).length;
-  const noSkip = completed.some(
-    (a) => (a.total_questions || 0) >= 20 && (a.correct_count || 0) + /* answered */ 0 >= 0
+  const trustProcess = completed.some(
+    (a) => (a.total_questions || 0) >= 20 && Number(a.correct_count) === a.total_questions
+      ? false // need all answered — check below
+      : (a.total_questions || 0) >= 20
   );
 
-  // No-skip: every item answered — approximate via correct+incorrect = total (we only store correct_count; use answers query below)
+  let allAnswered20 = false;
+  for (const a of completed.filter((x) => (x.total_questions || 0) >= 20).slice(0, 8)) {
+    const { count } = await supabase
+      .from('exam_answers')
+      .select('id', { count: 'exact', head: true })
+      .eq('attempt_id', a.id)
+      .not('selected_answer', 'is', null);
+    if ((count || 0) >= (a.total_questions || 0)) {
+      allAnswered20 = true;
+      break;
+    }
+  }
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('current_streak, best_streak')
+    .select('current_streak, best_streak, last_activity_date')
     .eq('id', userId)
     .single();
 
   const streak = profile?.current_streak || 0;
 
-  // Bookmarks
   const { count: bookmarkCount } = await supabase
     .from('bookmarks')
     .select('id', { count: 'exact', head: true })
     .eq('user_id', userId);
 
-  // Mistakes = incorrect answers across attempts
-  const { data: wrongRows } = await supabase
-    .from('exam_answers')
-    .select('id, attempt_id')
-    .eq('is_correct', false);
-  // Filter to this user's attempts
-  const attemptIds = new Set(completed.map((a) => a.id));
-  const mistakeCount = (wrongRows || []).filter((r) => attemptIds.has(r.attempt_id)).length;
+  const attemptIds = completed.map((a) => a.id);
+  const { data: wrongRows } = attemptIds.length
+    ? await supabase
+        .from('exam_answers')
+        .select('id, attempt_id')
+        .eq('is_correct', false)
+        .in('attempt_id', attemptIds)
+    : { data: [] as { id: string; attempt_id: string }[] };
+  const mistakeCount = (wrongRows || []).length;
 
-  // Activity by day for review_warrior / balanced / hopper
+  // Recovered questions: user_question_stats with attempts>=2 and correct_count>=1 after misses
+  const { data: qstats } = await supabase
+    .from('user_question_stats')
+    .select('attempts, correct_count')
+    .eq('user_id', userId);
+  const recovered = (qstats || []).filter(
+    (r) => (r.attempts || 0) >= 2 && (r.correct_count || 0) >= 1 && (r.attempts || 0) > (r.correct_count || 0)
+  ).length;
+  const waitIKnow = recovered >= 1;
+  const cleanMess = recovered >= 20;
+
   const { data: dailyAct } = await supabase
     .from('user_daily_activity')
-    .select('activity_date, questions_answered, practice_sessions, mock_exams, daily_challenge_completed')
-    .eq('user_id', userId);
+    .select('activity_date, questions_answered')
+    .eq('user_id', userId)
+    .order('activity_date', { ascending: true });
 
-  const maxQuestionsOneDay = Math.max(0, ...(dailyAct || []).map((d) => d.questions_answered || 0));
+  const maxQuestionsOneDay = Math.max(
+    0,
+    ...(dailyAct || []).map((d) => d.questions_answered || 0)
+  );
 
-  // Midnight / early bird from completed_at local hour
+  // Back from the dead: gap of 30+ days between activity days
+  let backFromDead = false;
+  const days = (dailyAct || []).map((d) => d.activity_date).filter(Boolean);
+  for (let i = 1; i < days.length; i++) {
+    const prev = new Date(days[i - 1] + 'T00:00:00').getTime();
+    const cur = new Date(days[i] + 'T00:00:00').getTime();
+    if ((cur - prev) / (86400000) >= 30) backFromDead = true;
+  }
+
   let midnight = false;
   let earlyBird = false;
   for (const a of completed) {
@@ -98,120 +163,57 @@ export async function checkAchievements(userId: string) {
     if (h >= 4 && h < 7) earlyBird = true;
   }
 
-  // Subject hopper: unique subjects in last 7 days from attempts
-  const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
-  const subjectsWeek = new Set<
-    string
-  >();
-  for (const a of completed) {
-    const t = a.completed_at ? new Date(a.completed_at).getTime() : 0;
-    if (t >= weekAgo && a.subject) subjectsWeek.add(a.subject);
-  }
-  // Also pull subjects from answers if attempt subject null
-  if (subjectsWeek.size < 5 && completed.length) {
-    const { data: ansSub } = await supabase
-      .from('exam_answers')
-      .select('attempt_id, question:questions(subject)')
-      .in(
-        'attempt_id',
-        completed.filter((a) => a.completed_at && new Date(a.completed_at).getTime() >= weekAgo).map((a) => a.id)
-      );
-    for (const row of ansSub || []) {
-      const subj = (row as { question?: { subject?: string } }).question?.subject;
-      if (subj) subjectsWeek.add(subj);
-    }
-  }
-
-  // Board exam energy: 3 mocks in 7 days
-  const mocksWeek = mocks.filter((a) => {
-    const t = a.completed_at ? new Date(a.completed_at).getTime() : 0;
-    return t >= weekAgo;
-  }).length;
-
-  // Lesson plan mode: same topic on 3 different completed attempts
-  const topicCounts: Record<string, number> = {};
-  for (const a of completed) {
-    if (a.topic) topicCounts[a.topic] = (topicCounts[a.topic] || 0) + 1;
-  }
-  const lessonPlan = Object.values(topicCounts).some((n) => n >= 3);
-
-  // Mock specialist: avg >= 75 across at least 5 mocks
-  let mockSpecialist = false;
-  if (mocks.length >= 5) {
-    const avg = mocks.reduce((s, a) => s + Number(a.score_percent || 0), 0) / mocks.length;
-    mockSpecialist = avg >= 75;
-  }
-
-  // Category accuracy from topic stats
+  // Subject tallies from topic stats
   const { data: topicStats } = await supabase
     .from('user_topic_stats')
-    .select('category, subject, topic, attempts, correct_count, accuracy')
+    .select('category, subject, attempts, correct_count')
     .eq('user_id', userId);
 
-  const stats = topicStats || [];
-  const sumCat = (cat: string) => {
-    const rows = stats.filter((s) => s.category === cat);
-    const attemptsN = rows.reduce((s, r) => s + (r.attempts || 0), 0);
-    const correctN = rows.reduce((s, r) => s + (r.correct_count || 0), 0);
-    return { attemptsN, correctN, acc: attemptsN ? (correctN / attemptsN) * 100 : 0 };
-  };
-  const gen = sumCat('GENERAL_EDUCATION');
-  const prof = sumCat('PROFESSIONAL_EDUCATION');
-
-  // Weak spot hunter: any topic with attempts suggesting recovery — if accuracy >= 70 and attempts >= 5
-  // (simplified: topic currently >= 70% with at least 8 attempts)
-  const weakSpotHunter = stats.some((s) => (s.attempts || 0) >= 8 && Number(s.accuracy) >= 70);
-
-  // Balanced educator: days with both categories practiced
-  // Approximate: completed attempts per day that include both categories via topic stats is hard;
-  // use attempts with category set
-  const daysGen = new Set<string>();
-  const daysProf = new Set<string>();
-  for (const a of completed) {
-    const dk = dateKey(a.completed_at);
-    if (!dk) continue;
-    if (a.category === 'GENERAL_EDUCATION') daysGen.add(dk);
-    if (a.category === 'PROFESSIONAL_EDUCATION') daysProf.add(dk);
-  }
-  let balancedDays = 0;
-  for (const d of daysGen) if (daysProf.has(d)) balancedDays++;
-
-  // Comeback kid: compare first half vs second half of chronological correct rates
-  let comeback = false;
-  if (completed.length >= 4) {
-    const ordered = [...completed].sort(
-      (a, b) => new Date(a.completed_at || 0).getTime() - new Date(b.completed_at || 0).getTime()
-    );
-    const mid = Math.floor(ordered.length / 2);
-    const early = ordered.slice(0, mid);
-    const late = ordered.slice(mid);
-    const rate = (arr: typeof ordered) => {
-      const t = arr.reduce((s, a) => s + (a.total_questions || 0), 0);
-      const c = arr.reduce((s, a) => s + (a.correct_count || 0), 0);
-      return t ? (c / t) * 100 : 0;
-    };
-    comeback = rate(late) - rate(early) >= 10;
+  let scienceQ = 0;
+  let mathQ = 0;
+  let commsQ = 0;
+  let histQ = 0;
+  let profQ = 0;
+  let genQ = 0;
+  for (const row of topicStats || []) {
+    const n = row.attempts || 0;
+    if (row.category === 'PROFESSIONAL_EDUCATION') profQ += n;
+    if (row.category === 'GENERAL_EDUCATION') genQ += n;
+    const b = subjectBucket(row.subject);
+    if (b === 'science') scienceQ += n;
+    if (b === 'math') mathQ += n;
+    if (b === 'comms') commsQ += n;
+    if (b === 'history') histQ += n;
   }
 
-  // No skip zone: session 20+ where correct_count + wrong roughly = total — fetch answer counts for large attempts
-  let noSkipZone = false;
-  const bigAttempts = completed.filter((a) => (a.total_questions || 0) >= 20);
-  if (bigAttempts.length) {
-    for (const a of bigAttempts.slice(0, 8)) {
-      const { count } = await supabase
-        .from('exam_answers')
-        .select('id', { count: 'exact', head: true })
-        .eq('attempt_id', a.id)
-        .not('selected_answer', 'is', null);
-      if ((count || 0) >= (a.total_questions || 0)) {
-        noSkipZone = true;
-        break;
-      }
+  const maxStreak = await maxCorrectStreakInAttempts(attemptIds);
+
+  // Wrong streak in a session (secret)
+  let maxWrongStreak = 0;
+  for (const id of attemptIds.slice(0, 10)) {
+    const { data } = await supabase
+      .from('exam_answers')
+      .select('is_correct, answered_at')
+      .eq('attempt_id', id)
+      .not('selected_answer', 'is', null)
+      .order('answered_at', { ascending: true });
+    let run = 0;
+    for (const row of data || []) {
+      if (row.is_correct === false) {
+        run++;
+        if (run > maxWrongStreak) maxWrongStreak = run;
+      } else run = 0;
     }
   }
 
+  const barelyPassed = completed.some((a) => {
+    const p = Number(a.score_percent);
+    return p >= 50 && p < 60 && (a.total_questions || 0) >= 10;
+  });
+
   const flags: Record<string, boolean> = {
-    first_step: practices.length >= 1 || mocks.length >= 1,
+    // legacy codes still in DB
+    first_step: totalQ >= 1 || practices.length + mocks.length >= 1,
     first_mock: mocks.length >= 1,
     questions_100: totalQ >= 100,
     questions_500: totalQ >= 500,
@@ -221,31 +223,61 @@ export async function checkAchievements(userId: string) {
     review_warrior: maxQuestionsOneDay >= 50,
     midnight_scholar: midnight,
     early_bird_educator: earlyBird,
-    almost_perfect: almostPerfectMock,
-    comeback_kid: comeback,
+    almost_perfect: academicDamage,
     mistake_collector: mistakeCount >= 25,
     bookmark_hoarder: (bookmarkCount || 0) >= 20,
-    topic_hopper: subjectsWeek.size >= 5,
-    mock_survivor: mockSurvivor,
-    daily_devotee: dailyCount >= 7,
-    no_skip_zone: noSkipZone,
-    board_exam_energy: mocksWeek >= 3,
-    lesson_plan_mode: lessonPlan,
-    faculty_room_regular: streak >= 14,
+    mock_survivor: mocks.some((a) => (a.time_limit_seconds || 0) > 0),
+    no_skip_zone: allAnswered20,
     practicum_ready: totalQ >= 200,
-    code_of_ethics_enjoyer: prof.correctN >= 30,
     century_club: totalCorrect >= 100,
     iron_reviewer: streak >= 30,
-    mock_specialist: mockSpecialist,
-    gened_anchor: gen.attemptsN >= 50 && gen.acc >= 80,
-    profed_anchor: prof.attemptsN >= 50 && prof.acc >= 80,
-    balanced_educator: balancedDays >= 5,
-    weak_spot_hunter: weakSpotHunter,
-    exam_day_calm: examDayCalm,
+    exam_day_calm: mocks.some(
+      (a) =>
+        (a.time_limit_seconds || 0) > 0 &&
+        a.time_used_seconds != null &&
+        a.time_used_seconds < a.time_limit_seconds
+    ),
+
+    // v2 catalog
+    warm_up_act: totalQ >= 10,
+    brain_booting: totalQ >= 50,
+    getting_serious: totalQ >= 100,
+    clean_sweep: perfect,
+    academic_damage: academicDamage,
+    deadeye: maxStreak >= 10,
+    on_fire: maxStreak >= 20,
+    brick_by_brick: totalQ >= 500,
+    built_different: totalQ >= 1000,
+    question_hoarder: (bookmarkCount || 0) >= 25,
+    science_survivor: scienceQ >= 50,
+    math_survivor: mathQ >= 50,
+    word_warrior: commsQ >= 50,
+    kasaysayan_survivor: histQ >= 50,
+    teacher_mode: profQ >= 100,
+    still_studying: streak >= 3,
+    no_days_off: streak >= 7,
+    im_still_here: streak >= 30,
+    streak_goblin_14: streak >= 14,
+    streak_goblin_100: streak >= 100,
+    night_owl: midnight,
+    early_bird: earlyBird,
+    one_more_question: maxQuestionsOneDay >= 50,
+    speed_demon: speedDemon,
+    trust_the_process: allAnswered20,
+    mistake_detective: mistakeCount >= 20,
+    wait_i_know_this: waitIKnow,
+    clean_your_mess: cleanMess,
+    future_teacher_loading: totalQ >= 200,
+    gened_warrior: genQ >= 50,
+    profed_survivor: profQ >= 50,
+    let_me_cook: mocks.length >= 5,
+
+    secret_back_from_dead: backFromDead,
+    secret_what_was_that: maxWrongStreak >= 5,
+    secret_barely_passed: barelyPassed,
   };
 
-  // silence unused
-  void noSkip;
+  void trustProcess;
 
   const toAward: string[] = [];
   for (const ach of allAchievements as Achievement[]) {
@@ -277,4 +309,8 @@ export async function getAllAchievements(): Promise<Achievement[]> {
   const { data, error } = await supabase.from('achievements').select('*').order('title');
   if (error) throw error;
   return (data || []) as Achievement[];
+}
+
+export function isSecretAchievement(code: string): boolean {
+  return code.startsWith('secret_');
 }
