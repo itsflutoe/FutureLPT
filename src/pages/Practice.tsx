@@ -20,11 +20,11 @@ const CATEGORIES = [
   { id: 'MIXED' as const, label: 'Mixed' },
 ];
 
-const QUICK_STARTS: { cat: PracticeCategory; label: string; primary?: boolean }[] = [
-  { cat: 'PROFESSIONAL_EDUCATION', label: 'Professional Education', primary: true },
-  { cat: 'GENERAL_EDUCATION', label: 'General Education' },
-  { cat: 'SPECIALIZATION', label: 'Specialization' },
-  { cat: 'MIXED', label: 'Mixed (all categories)' },
+const QUICK_STARTS: { cat: PracticeCategory; label: string; variant: 'primary' | 'outline' }[] = [
+  { cat: 'PROFESSIONAL_EDUCATION', label: 'Professional Education', variant: 'primary' },
+  { cat: 'GENERAL_EDUCATION', label: 'General Education', variant: 'outline' },
+  { cat: 'SPECIALIZATION', label: 'Specialization', variant: 'outline' },
+  { cat: 'MIXED', label: 'Mixed (all categories)', variant: 'outline' },
 ];
 
 export default function Practice() {
@@ -196,7 +196,7 @@ export default function Practice() {
           {QUICK_STARTS.map((item) => (
             <Button
               key={item.cat}
-              variant={item.primary ? 'default' : 'outline'}
+              variant={item.variant}
               className="w-full min-h-12 justify-between"
               disabled={loading}
               onClick={() => quickStart(item.cat)}
