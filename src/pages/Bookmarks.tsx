@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { getBookmarks, removeBookmark } from '@/services/bookmarks';
 import type { Bookmark, Question } from '@/types';
@@ -26,33 +27,86 @@ export default function Bookmarks() {
     setItems((prev) => prev.filter((b) => b.question_id !== qid));
   };
 
-  if (loading) return <div className="flex justify-center py-32"><Spinner /></div>;
+  if (loading) {
+    return (
+      <div className="flex justify-center py-32">
+        <Spinner />
+      </div>
+    );
+  }
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-8">
-      <h1 className="text-2xl font-bold mb-2">Bookmarks</h1>
-      <p className="text-[var(--muted-foreground)] mb-6">Questions you saved for later review.</p>
+    <div className="mx-auto max-w-lg px-4 py-6 sm:py-8">
+      <h1 className="text-2xl font-bold mb-1">Bookmarks</h1>
+      <p className="text-sm text-[var(--muted-foreground)] mb-6">
+        Saved during practice — review later or remove when done.
+      </p>
+
       {items.length === 0 ? (
         <Card>
-          <CardContent className="p-8 text-center text-[var(--muted-foreground)]">
-            Save questions here when you want to review them later.
+          <CardContent className="p-8 text-center space-y-3">
+            <p className="text-sm text-[var(--muted-foreground)]">
+              No bookmarks yet. Tap the bookmark icon while answering a question.
+            </p>
+            <Link to="/practice">
+              <Button className="w-full sm:w-auto">Start practicing</Button>
+            </Link>
           </CardContent>
         </Card>
       ) : (
         <div className="space-y-3">
+          <p className="text-xs text-[var(--muted-foreground)]">{items.length} saved</p>
           {items.map((b) => (
             <Card key={b.id}>
-              <CardContent className="p-4">
-                <div className="flex gap-2 mb-2">
+              <CardContent className="p-4 space-y-2">
+                <div className="flex flex-wrap gap-2">
                   <Badge variant="outline">{b.question?.subject}</Badge>
+                  {b.question?.topic && <Badge variant="outline">{b.question.topic}</Badge>}
                   <Badge variant="outline">{b.question?.difficulty?.toLowerCase()}</Badge>
                 </div>
-                <p className="text-sm mb-2">{b.question?.question}</p>
-                <div className="flex items-center justify-between">
+                <p className="text-sm font-medium leading-relaxed">{b.question?.question}</p>
+                {b.question?.correct_answer && (
+                  <p className="text-sm">
+                    Answer: <strong>{b.question.correct_answer}</strong>
+                    {b.question.option_a && b.question.correct_answer === 'A'
+                      ? ` — ${b.question.option_a}`
+                      : ''}
+                    {b.question.option_b && b.question.correct_answer === 'B'
+                      ? ` — ${b.question.option_b}`
+                      : ''}
+                    {b.question.option_c && b.question.correct_answer === 'C'
+                      ? ` — ${b.question.option_c}`
+                      : ''}
+                    {b.question.option_d && b.question.correct_answer === 'D'
+                      ? ` — ${b.question.option_d}`
+                      : ''}
+                  </p>
+                )}
+                {b.question?.explanation && (
+                  <p className="text-sm text-[var(--muted-foreground)] border-t border-[var(--border)] pt-2 leading-relaxed">
+                    {b.question.explanation}
+                  </p>
+                )}
+                <div className="flex items-center justify-between gap-2 pt-1">
                   <span className="text-xs text-[var(--muted-foreground)]">
                     {format(new Date(b.created_at), 'MMM d, yyyy')}
                   </span>
-                  <Button size="sm" variant="ghost" onClick={() => handleRemove(b.question_id)}>Remove</Button>
+                  <div className="flex gap-2">
+                    {b.question?.subject && (
+                      <Link
+                        to={`/practice?subject=${encodeURIComponent(b.question.subject)}${
+                          b.question.category ? `&category=${b.question.category}` : ''
+                        }`}
+                      >
+                        <Button size="sm" variant="outline">
+                          Practice
+                        </Button>
+                      </Link>
+                    )}
+                    <Button size="sm" variant="ghost" onClick={() => handleRemove(b.question_id)}>
+                      Remove
+                    </Button>
+                  </div>
                 </div>
               </CardContent>
             </Card>

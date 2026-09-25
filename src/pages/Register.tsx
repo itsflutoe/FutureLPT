@@ -55,7 +55,7 @@ export default function Register() {
           </div>
           <CardTitle>Create your account</CardTitle>
           <p className="text-sm text-[var(--muted-foreground)]">
-            Start preparing for the LET with a personal companion.
+            Username + password only — no email required.
           </p>
         </CardHeader>
         <CardContent>
@@ -118,8 +118,8 @@ export default function Register() {
                 disabled={loading}
               />
             </div>
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? 'Creating account…' : 'Create Account'}
+            <Button type="submit" className="w-full min-h-12" disabled={loading}>
+              {loading ? 'Creating account…' : 'Create account'}
             </Button>
           </form>
           <p className="mt-6 text-center text-sm text-[var(--muted-foreground)]">
@@ -128,7 +128,7 @@ export default function Register() {
               Log in
             </Link>
           </p>
-          <p className="mt-4 text-xs text-center text-[var(--muted-foreground)]">
+          <p className="mt-4 text-xs text-center text-[var(--muted-foreground)] leading-relaxed">
             FLPT is not affiliated with PRC or CHED. Practice material is LET-style only.
           </p>
         </CardContent>
