@@ -63,7 +63,7 @@ export default function Settings() {
   };
 
   return (
-    <div className="mx-auto max-w-2xl px-4 py-8 space-y-6 overflow-x-clip">
+    <div className="mx-auto max-w-lg px-4 py-6 sm:py-8 space-y-5 overflow-x-clip">
       <h1 className="text-2xl font-bold">Settings</h1>
       {msg && (
         <div className="rounded-xl bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 px-4 py-3 text-sm">
@@ -77,19 +77,19 @@ export default function Settings() {
       )}
 
       <Card>
-        <CardHeader>
+        <CardHeader className="pb-2">
           <CardTitle className="text-base">Appearance</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div>
             <label className="text-sm font-medium mb-2 block">Theme</label>
-            <div className="flex flex-wrap gap-2">
+            <div className="grid grid-cols-3 gap-2">
               {(['system', 'light', 'dark'] as ThemeMode[]).map((t) => (
                 <button
                   key={t}
                   type="button"
                   onClick={() => setTheme(t)}
-                  className={`rounded-lg border px-3 py-1.5 text-sm capitalize min-h-9 ${
+                  className={`rounded-lg border px-3 py-2.5 text-sm capitalize min-h-11 ${
                     theme === t
                       ? 'border-[var(--accent-color)] bg-[var(--accent-color)]/10'
                       : 'border-[var(--border)]'
@@ -102,13 +102,13 @@ export default function Settings() {
           </div>
           <div>
             <label className="text-sm font-medium mb-2 block">Accent color</label>
-            <div className="flex gap-3">
+            <div className="flex gap-3 flex-wrap">
               {(Object.keys(ACCENT_COLORS) as AccentColor[]).map((c) => (
                 <button
                   key={c}
                   type="button"
                   onClick={() => setAccent(c)}
-                  className={`h-9 w-9 rounded-full border-2 ${accent === c ? 'border-[var(--foreground)]' : 'border-transparent'}`}
+                  className={`h-10 w-10 rounded-full border-2 ${accent === c ? 'border-[var(--foreground)]' : 'border-transparent'}`}
                   style={{ backgroundColor: ACCENT_COLORS[c] }}
                   aria-label={c}
                 />
@@ -119,7 +119,7 @@ export default function Settings() {
       </Card>
 
       <Card>
-        <CardHeader>
+        <CardHeader className="pb-2">
           <CardTitle className="text-base">Account</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -130,27 +130,36 @@ export default function Settings() {
           <div>
             <label className="text-sm font-medium mb-1.5 block">Username</label>
             <Input value={profile?.username || ''} disabled />
+            <p className="text-xs text-[var(--muted-foreground)] mt-1">Username cannot be changed.</p>
           </div>
-          <Button onClick={saveProfile} disabled={saving || !displayName.trim()}>
+          <Button
+            className="w-full"
+            onClick={saveProfile}
+            disabled={saving || !displayName.trim()}
+          >
             {saving ? 'Saving…' : 'Save profile'}
           </Button>
         </CardContent>
       </Card>
 
       <Card>
-        <CardHeader>
+        <CardHeader className="pb-2">
           <CardTitle className="text-base">Change password</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <Input
             type="password"
-            placeholder="New password"
+            placeholder="New password (min 6 characters)"
             value={newPassword}
             onChange={(e) => setNewPassword(e.target.value)}
             minLength={6}
             autoComplete="new-password"
           />
-          <Button onClick={changePassword} disabled={changingPw || newPassword.length < 6}>
+          <Button
+            className="w-full"
+            onClick={changePassword}
+            disabled={changingPw || newPassword.length < 6}
+          >
             {changingPw ? 'Updating…' : 'Update password'}
           </Button>
         </CardContent>

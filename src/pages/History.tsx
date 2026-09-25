@@ -10,6 +10,11 @@ import { Badge } from '@/components/ui/Badge';
 import { Spinner } from '@/components/ui/Spinner';
 import { Button } from '@/components/ui/Button';
 
+function sessionTitle(h: ExamAttempt): string {
+  if (h.is_daily_challenge) return 'Daily Challenge';
+  return h.subject || h.category?.replace(/_/g, ' ') || 'Mixed';
+}
+
 export default function History() {
   const { user } = useAuth();
   const [history, setHistory] = useState<ExamAttempt[]>([]);
@@ -20,31 +25,52 @@ export default function History() {
     getUserHistory(user.id, 50).then(setHistory).finally(() => setLoading(false));
   }, [user]);
 
-  if (loading) return <div className="flex justify-center py-32"><Spinner /></div>;
+  if (loading) {
+    return (
+      <div className="flex justify-center py-32">
+        <Spinner />
+      </div>
+    );
+  }
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-8">
-      <h1 className="text-2xl font-bold mb-6">History</h1>
+    <div className="mx-auto max-w-lg px-4 py-6 sm:py-8">
+      <h1 className="text-2xl font-bold mb-1">History</h1>
+      <p className="text-sm text-[var(--muted-foreground)] mb-6">Completed practice and mocks</p>
+
       {history.length === 0 ? (
         <Card>
-          <CardContent className="p-8 text-center">
-            <p className="text-[var(--muted-foreground)] mb-4">You haven't completed a session yet.</p>
-            <Link to="/practice"><Button>Take Your First Exam</Button></Link>
+          <CardContent className="p-8 text-center space-y-3">
+            <p className="text-sm text-[var(--muted-foreground)]">No completed sessions yet.</p>
+            <Link to="/practice">
+              <Button className="w-full sm:w-auto">Start practicing</Button>
+            </Link>
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-2">
           {history.map((h) => (
-            <Link key={h.id} to={`/results/${h.id}`}>
+            <Link key={h.id} to={`/results/${h.id}`} className="block">
               <Card className="hover:bg-[var(--muted)]/30 transition-colors">
-                <CardContent className="p-4 flex items-center justify-between">
-                  <div>
-                    <div className="font-medium text-sm">{h.subject || h.category || 'Mixed'}</div>
+                <CardContent className="p-4 flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="font-medium text-sm truncate">{sessionTitle(h)}</div>
                     <div className="text-xs text-[var(--muted-foreground)]">
-                      {h.total_questions} questions · {h.mode} · {h.completed_at ? format(new Date(h.completed_at), 'MMM d, yyyy') : ''}
+                      {h.total_questions} Q · {h.mode}
+                      {h.completed_at
+                        ? ` · ${format(new Date(h.completed_at), 'MMM d, yyyy')}`
+                        : ''}
                     </div>
                   </div>
-                  <Badge variant={Number(h.score_percent) >= 75 ? 'success' : Number(h.score_percent) >= 50 ? 'warning' : 'error'}>
+                  <Badge
+                    variant={
+                      Number(h.score_percent) >= 75
+                        ? 'success'
+                        : Number(h.score_percent) >= 50
+                          ? 'warning'
+                          : 'error'
+                    }
+                  >
                     {formatPercent(Number(h.score_percent))}
                   </Badge>
                 </CardContent>

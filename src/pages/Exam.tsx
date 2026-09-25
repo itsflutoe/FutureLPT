@@ -72,16 +72,19 @@ export default function Exam() {
       setTimeLeft((t) => {
         if (t === null || t <= 1) {
           clearInterval(id);
-          handleSubmit();
+          void handleSubmit(true);
           return 0;
         }
         return t - 1;
       });
     }, 1000);
     return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [timeLeft, isPractice]);
 
   const q = questions[current];
+  const answeredCount = questions.filter((qq) => !!answers[qq.id]?.selected_answer).length;
+  const unansweredCount = questions.length - answeredCount;
 
   useEffect(() => {
     if (!q) return;
@@ -129,22 +132,37 @@ export default function Exam() {
     }
   };
 
-  const handleSubmit = useCallback(async () => {
-    if (!attemptId || !user || submitting) return;
-    setSubmitting(true);
-    try {
-      const timeUsed = Math.floor((Date.now() - startTime.current) / 1000);
-      await completeAttempt(attemptId, user.id, timeUsed);
-      sessionStorage.removeItem(`exam_${attemptId}`);
-      navigate(`/results/${attemptId}`);
-    } catch (e) {
-      console.error(e);
-      setSubmitting(false);
-    }
-  }, [attemptId, user, submitting, navigate]);
+  const handleSubmit = useCallback(
+    async (fromTimer = false) => {
+      if (!attemptId || !user || submitting) return;
+
+      if (!fromTimer && unansweredCount > 0) {
+        const ok = window.confirm(
+          `You still have ${unansweredCount} unanswered question${unansweredCount === 1 ? '' : 's'}.\n\nSubmit anyway?`
+        );
+        if (!ok) return;
+      }
+
+      setSubmitting(true);
+      try {
+        const timeUsed = Math.floor((Date.now() - startTime.current) / 1000);
+        await completeAttempt(attemptId, user.id, timeUsed);
+        sessionStorage.removeItem(`exam_${attemptId}`);
+        navigate(`/results/${attemptId}`);
+      } catch (e) {
+        console.error(e);
+        setSubmitting(false);
+      }
+    },
+    [attemptId, user, submitting, navigate, unansweredCount]
+  );
 
   const handleExit = () => {
-    if (window.confirm('Leave this session? Your answers so far are saved. You can review completed attempts in History.')) {
+    if (
+      window.confirm(
+        'Leave this session? Answers so far are saved. Finish later from a new session — incomplete runs are not listed as results until you submit.'
+      )
+    ) {
       navigate('/dashboard');
     }
   };
@@ -166,18 +184,22 @@ export default function Exam() {
 
   return (
     <div className="mx-auto max-w-3xl min-h-screen flex flex-col bg-[var(--background)]">
-      {/* Focus header — no app chrome */}
       <header className="sticky top-0 z-20 border-b border-[var(--border)] bg-[var(--background)]/95 backdrop-blur px-3 pt-[max(0.5rem,env(safe-area-inset-top))] pb-2">
         <div className="flex items-center justify-between gap-2">
           <button
             type="button"
             onClick={handleExit}
-            className="text-sm text-[var(--muted-foreground)] hover:text-[var(--foreground)] px-1 py-2"
+            className="text-sm text-[var(--muted-foreground)] hover:text-[var(--foreground)] px-1 py-2 min-h-11"
           >
             Exit
           </button>
-          <div className="text-sm font-semibold tabular-nums">
-            {current + 1} / {questions.length}
+          <div className="text-center">
+            <div className="text-sm font-semibold tabular-nums">
+              {current + 1} / {questions.length}
+            </div>
+            <div className="text-[10px] text-[var(--muted-foreground)] tabular-nums">
+              {answeredCount} answered
+            </div>
           </div>
           <div className="flex items-center gap-0.5">
             {timeLeft !== null && !isPractice && (
@@ -187,15 +209,23 @@ export default function Exam() {
                 {formatDuration(timeLeft)}
               </span>
             )}
-            <button onClick={toggleFlag} className="p-2 rounded-lg hover:bg-[var(--muted)]" aria-label="Flag">
+            <button
+              type="button"
+              onClick={toggleFlag}
+              className="p-2 rounded-lg hover:bg-[var(--muted)] min-h-11 min-w-11"
+              aria-label="Flag question"
+            >
               <Flag className={`h-5 w-5 ${flagged.has(q.id) ? 'text-amber-500 fill-amber-500' : ''}`} />
             </button>
             <button
+              type="button"
               onClick={toggleBookmark}
-              className="p-2 rounded-lg hover:bg-[var(--muted)]"
-              aria-label="Bookmark"
+              className="p-2 rounded-lg hover:bg-[var(--muted)] min-h-11 min-w-11"
+              aria-label="Bookmark question"
             >
-              <Bookmark className={`h-5 w-5 ${bookmarked ? 'text-[var(--accent-color)] fill-current' : ''}`} />
+              <Bookmark
+                className={`h-5 w-5 ${bookmarked ? 'text-[var(--accent-color)] fill-current' : ''}`}
+              />
             </button>
           </div>
         </div>
@@ -207,11 +237,11 @@ export default function Exam() {
         </div>
       </header>
 
-      {/* Question body — pad bottom for fixed controls */}
-      <div className="flex-1 px-4 py-4 pb-36">
+      <div className="flex-1 px-4 py-4 pb-40">
         <div className="mb-2 flex flex-wrap gap-2">
           <Badge variant="outline">{q.subject}</Badge>
           <Badge variant="outline">{q.difficulty.toLowerCase()}</Badge>
+          {attempt?.is_daily_challenge && <Badge variant="outline">Daily</Badge>}
         </div>
         <p className="text-base sm:text-lg leading-relaxed mb-5">{q.question}</p>
 
@@ -261,25 +291,32 @@ export default function Exam() {
 
         {isPractice && showFeedback && (
           <div className="mt-6 rounded-xl border border-[var(--border)] bg-[var(--muted)]/30 p-4">
-            <div className="flex items-center gap-2 mb-2">
+            <div className="flex items-center gap-2 mb-2 flex-wrap">
               {selected === q.correct_answer ? (
                 <Badge variant="success">Correct</Badge>
               ) : (
                 <Badge variant="error">Incorrect</Badge>
               )}
               <span className="text-sm">
-                Correct answer: <strong>{q.correct_answer}</strong>
+                Correct: <strong>{q.correct_answer}</strong>
               </span>
             </div>
             <p className="text-sm leading-relaxed text-[var(--foreground)]">{q.explanation}</p>
             {q.reference && (
               <p className="text-xs text-[var(--muted-foreground)] mt-2">Reference: {q.reference}</p>
             )}
+            {current < questions.length - 1 && (
+              <Button
+                className="w-full mt-4 min-h-11"
+                onClick={() => setCurrent((c) => c + 1)}
+              >
+                Next question
+              </Button>
+            )}
           </div>
         )}
       </div>
 
-      {/* Fixed bottom controls — always visible */}
       <footer
         className="fixed bottom-0 inset-x-0 z-20 border-t border-[var(--border)] bg-[var(--card)]/95 backdrop-blur px-3 pt-2"
         style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
@@ -299,6 +336,7 @@ export default function Exam() {
                   type="button"
                   onClick={() => setCurrent(i)}
                   className={`h-9 w-9 shrink-0 rounded-lg text-xs font-medium ${cls}`}
+                  aria-label={`Question ${i + 1}`}
                 >
                   {i + 1}
                 </button>
@@ -322,7 +360,11 @@ export default function Exam() {
                 Next <ChevronRight className="h-4 w-4" />
               </Button>
             ) : (
-              <Button onClick={handleSubmit} disabled={submitting} className="min-h-11 flex-1 sm:flex-none">
+              <Button
+                onClick={() => handleSubmit(false)}
+                disabled={submitting}
+                className="min-h-11 flex-1 sm:flex-none"
+              >
                 {submitting ? 'Submitting…' : 'Submit'}
               </Button>
             )}
