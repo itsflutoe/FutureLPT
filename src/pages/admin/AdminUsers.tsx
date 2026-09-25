@@ -45,6 +45,7 @@ export default function AdminUsers() {
     setConfirmPassword('');
     setError('');
     setStatus('');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const closeManage = () => {
@@ -172,64 +173,83 @@ export default function AdminUsers() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-8 space-y-4">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+    <div className="mx-auto max-w-lg px-4 py-6 sm:py-8 space-y-4">
+      <div className="space-y-3">
         <h1 className="text-2xl font-bold">Users</h1>
-        <Button variant="danger" size="sm" disabled={resettingAll} onClick={resetAllProgress}>
+        <Button
+          variant="danger"
+          className="w-full sm:w-auto"
+          disabled={resettingAll}
+          onClick={resetAllProgress}
+        >
           {resettingAll ? 'Resetting all…' : 'Reset all progress'}
         </Button>
+        <p className="text-xs text-[var(--muted-foreground)] leading-relaxed">
+          Clears study data for every account. Does not delete logins or the question bank.
+        </p>
       </div>
 
-      <p className="text-xs text-[var(--muted-foreground)]">
-        “Reset all progress” clears study data for every account. It does not delete logins or the
-        question bank.
-      </p>
-
       {error && !managing && (
-        <div className="rounded-xl bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 px-4 py-3 text-sm">
+        <div
+          role="alert"
+          className="rounded-xl bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 px-4 py-3 text-sm"
+        >
           {error}
         </div>
       )}
       {status && !managing && (
-        <div className="rounded-xl bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 px-4 py-3 text-sm">
+        <div
+          role="status"
+          className="rounded-xl bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 px-4 py-3 text-sm"
+        >
           {status}
         </div>
       )}
 
       {managing && (
         <Card>
-          <CardContent className="p-5 space-y-4">
+          <CardContent className="p-4 space-y-4">
             <div className="flex items-start justify-between gap-3">
-              <div>
-                <h2 className="font-semibold">Manage User</h2>
-                <p className="text-sm text-[var(--muted-foreground)] mt-0.5">
+              <div className="min-w-0">
+                <h2 className="font-semibold">Manage user</h2>
+                <p className="text-sm text-[var(--muted-foreground)] mt-0.5 truncate">
                   {managing.display_name} · @{managing.username}
                 </p>
               </div>
-              <Badge variant={managing.role === 'ADMIN' ? 'success' : 'outline'}>{managing.role}</Badge>
+              <Badge variant={managing.role === 'ADMIN' ? 'success' : 'outline'}>
+                {managing.role}
+              </Badge>
             </div>
 
             <div className="border-t border-[var(--border)] pt-4 space-y-3">
-              <h3 className="text-sm font-medium">Reset Password</h3>
+              <h3 className="text-sm font-medium">Reset password</h3>
               <p className="text-xs text-[var(--muted-foreground)]">
-                Sets a new password in Supabase Auth. The user signs in with their username and this
-                new password.
+                User signs in with username + this new password.
               </p>
 
               {error && (
-                <div className="rounded-xl bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 px-4 py-3 text-sm">
+                <div
+                  role="alert"
+                  className="rounded-xl bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 px-4 py-3 text-sm"
+                >
                   {error}
                 </div>
               )}
               {status && (
-                <div className="rounded-xl bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 px-4 py-3 text-sm">
+                <div
+                  role="status"
+                  className="rounded-xl bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 px-4 py-3 text-sm"
+                >
                   {status}
                 </div>
               )}
 
               <div>
-                <label className="text-xs font-medium mb-1 block">New Password</label>
+                <label htmlFor="admin-new-pw" className="text-xs font-medium mb-1 block">
+                  New password
+                </label>
                 <Input
+                  id="admin-new-pw"
                   type="password"
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
@@ -238,8 +258,11 @@ export default function AdminUsers() {
                 />
               </div>
               <div>
-                <label className="text-xs font-medium mb-1 block">Confirm New Password</label>
+                <label htmlFor="admin-confirm-pw" className="text-xs font-medium mb-1 block">
+                  Confirm password
+                </label>
                 <Input
+                  id="admin-confirm-pw"
                   type="password"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
@@ -248,18 +271,24 @@ export default function AdminUsers() {
                 />
               </div>
 
-              <div className="flex flex-wrap gap-2">
-                <Button onClick={resetPassword} disabled={resetting}>
-                  {resetting ? 'Resetting…' : 'Reset Password'}
+              <div className="flex flex-col gap-2">
+                <Button className="w-full" onClick={resetPassword} disabled={resetting}>
+                  {resetting ? 'Resetting…' : 'Reset password'}
                 </Button>
                 <Button
+                  className="w-full"
                   variant="danger"
                   onClick={resetUserProgress}
                   disabled={resettingProgress || resetting}
                 >
                   {resettingProgress ? 'Resetting…' : 'Reset progress'}
                 </Button>
-                <Button variant="outline" onClick={closeManage} disabled={resetting || resettingProgress}>
+                <Button
+                  className="w-full"
+                  variant="outline"
+                  onClick={closeManage}
+                  disabled={resetting || resettingProgress}
+                >
                   Close
                 </Button>
               </div>
@@ -271,20 +300,20 @@ export default function AdminUsers() {
       <div className="space-y-2">
         {users.map((u) => (
           <Card key={u.id}>
-            <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <CardContent className="p-4 space-y-3">
               <div className="min-w-0">
-                <div className="font-medium text-sm">
+                <div className="font-medium text-sm truncate">
                   {u.display_name}{' '}
                   <span className="text-[var(--muted-foreground)]">@{u.username}</span>
                 </div>
-                <div className="text-xs text-[var(--muted-foreground)]">
+                <div className="text-xs text-[var(--muted-foreground)] mt-0.5">
                   Joined {format(new Date(u.created_at), 'MMM d, yyyy')} · Streak {u.current_streak}
                 </div>
               </div>
               <div className="flex items-center gap-2">
                 <Badge variant={u.role === 'ADMIN' ? 'success' : 'outline'}>{u.role}</Badge>
-                <Button size="sm" variant="outline" onClick={() => openManage(u)}>
-                  Manage User
+                <Button size="sm" variant="outline" className="flex-1" onClick={() => openManage(u)}>
+                  Manage
                 </Button>
               </div>
             </CardContent>

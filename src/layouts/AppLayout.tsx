@@ -60,14 +60,14 @@ function NavItem({
       onClick={onClick}
       className={({ isActive }) =>
         cn(
-          'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors',
+          'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors min-h-11',
           isActive
             ? 'bg-[var(--accent-color)]/10 text-[var(--accent-color)]'
             : 'text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]'
         )
       }
     >
-      <Icon className="h-5 w-5 shrink-0" />
+      <Icon className="h-5 w-5 shrink-0" aria-hidden />
       {label}
     </NavLink>
   );
@@ -98,7 +98,17 @@ export default function AppLayout() {
 
   return (
     <div className="flex min-h-screen max-w-[100vw] overflow-x-clip bg-[var(--background)]">
-      <aside className="hidden lg:flex lg:w-60 lg:flex-col lg:fixed lg:inset-y-0 border-r border-[var(--border)] bg-[var(--card)]">
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[100] focus:rounded-lg focus:bg-[var(--accent-color)] focus:px-4 focus:py-2 focus:text-white focus:text-sm"
+      >
+        Skip to main content
+      </a>
+
+      <aside
+        className="hidden lg:flex lg:w-60 lg:flex-col lg:fixed lg:inset-y-0 border-r border-[var(--border)] bg-[var(--card)]"
+        aria-label="Main navigation"
+      >
         <div className="flex h-16 items-center gap-2 px-5 border-b border-[var(--border)]">
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--accent-color)] text-white font-bold text-sm">
             FL
@@ -131,10 +141,11 @@ export default function AppLayout() {
           <NavItem to="/profile" label="Profile" icon={User} />
           <NavItem to="/settings" label="Settings" icon={Settings} />
           <button
+            type="button"
             onClick={handleLogout}
-            className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-[var(--muted-foreground)] hover:bg-[var(--muted)]"
+            className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-[var(--muted-foreground)] hover:bg-[var(--muted)] min-h-11"
           >
-            <LogOut className="h-5 w-5" />
+            <LogOut className="h-5 w-5" aria-hidden />
             Log out
           </button>
         </div>
@@ -147,19 +158,29 @@ export default function AppLayout() {
           </div>
           <span className="font-semibold text-sm">FLPT</span>
         </div>
-        <button onClick={() => setSidebarOpen(true)} aria-label="Open menu" className="shrink-0 p-1">
-          <Menu className="h-6 w-6" />
+        <button
+          type="button"
+          onClick={() => setSidebarOpen(true)}
+          aria-label="Open menu"
+          className="shrink-0 p-2 min-h-11 min-w-11 flex items-center justify-center"
+        >
+          <Menu className="h-6 w-6" aria-hidden />
         </button>
       </div>
 
       {sidebarOpen && (
-        <div className="lg:hidden fixed inset-0 z-50">
+        <div className="lg:hidden fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label="Menu">
           <div className="absolute inset-0 bg-black/40" onClick={closeMobile} />
           <div className="absolute inset-y-0 left-0 w-[min(18rem,85vw)] max-w-full bg-[var(--card)] shadow-xl p-4 overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
               <span className="font-semibold">Menu</span>
-              <button onClick={closeMobile} aria-label="Close menu">
-                <X className="h-5 w-5" />
+              <button
+                type="button"
+                onClick={closeMobile}
+                aria-label="Close menu"
+                className="p-2 min-h-11 min-w-11 flex items-center justify-center"
+              >
+                <X className="h-5 w-5" aria-hidden />
               </button>
             </div>
             <nav className="space-y-4">
@@ -182,10 +203,11 @@ export default function AppLayout() {
                 <NavItem to="/profile" label="Profile" icon={User} onClick={closeMobile} />
                 <NavItem to="/settings" label="Settings" icon={Settings} onClick={closeMobile} />
                 <button
+                  type="button"
                   onClick={handleLogout}
-                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-[var(--muted-foreground)]"
+                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-[var(--muted-foreground)] min-h-11"
                 >
-                  <LogOut className="h-5 w-5" /> Log out
+                  <LogOut className="h-5 w-5" aria-hidden /> Log out
                 </button>
               </div>
             </nav>
@@ -194,7 +216,11 @@ export default function AppLayout() {
       )}
 
       <main className="flex-1 min-w-0 lg:pl-60">
-        <div className="min-h-screen max-w-full overflow-x-clip pt-14 lg:pt-0 pb-20 lg:pb-0">
+        <div
+          id="main-content"
+          tabIndex={-1}
+          className="min-h-screen max-w-full overflow-x-clip pt-14 lg:pt-0 pb-20 lg:pb-0 outline-none"
+        >
           <Outlet />
         </div>
       </main>
@@ -202,20 +228,21 @@ export default function AppLayout() {
       <nav
         className="lg:hidden fixed bottom-0 inset-x-0 z-40 border-t border-[var(--border)] bg-[var(--card)] max-w-[100vw]"
         style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+        aria-label="Primary"
       >
-        <div className="flex justify-around py-2">
+        <div className="flex justify-around py-1">
           {bottomNav.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
               className={({ isActive }) =>
                 cn(
-                  'flex flex-col items-center gap-0.5 px-1.5 py-1 text-[10px] sm:text-xs min-w-0 flex-1 max-w-[4.5rem]',
+                  'flex flex-col items-center justify-center gap-0.5 px-1.5 py-1.5 text-[10px] sm:text-xs min-w-0 flex-1 max-w-[4.5rem] min-h-12',
                   isActive ? 'text-[var(--accent-color)]' : 'text-[var(--muted-foreground)]'
                 )
               }
             >
-              <item.icon className="h-5 w-5 shrink-0" />
+              <item.icon className="h-5 w-5 shrink-0" aria-hidden />
               <span className="truncate w-full text-center">{item.label}</span>
             </NavLink>
           ))}
