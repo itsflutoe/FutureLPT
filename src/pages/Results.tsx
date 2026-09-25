@@ -1,13 +1,15 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getAttempt, getAttemptAnswers } from '@/services/exams';
 import type { ExamAttempt, ExamAnswer, Question } from '@/types';
 import { formatPercent } from '@/lib/utils';
+import { DAILY_CHALLENGE_RESULT_VIDEO_URL } from '@/config/media';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { Spinner } from '@/components/ui/Spinner';
+import { Volume2, VolumeX, X } from 'lucide-react';
 
 export default function Results() {
   const { attemptId } = useParams<{ attemptId: string }>();
@@ -16,6 +18,9 @@ export default function Results() {
   const [answers, setAnswers] = useState<(ExamAnswer & { question: Question })[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'correct' | 'incorrect' | 'flagged'>('all');
+  const [showVideo, setShowVideo] = useState(true);
+  const [muted, setMuted] = useState(true);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
 
   useEffect(() => {
     if (!attemptId) return;
@@ -24,6 +29,7 @@ export default function Results() {
         const [att, ans] = await Promise.all([getAttempt(attemptId), getAttemptAnswers(attemptId)]);
         setAttempt(att);
         setAnswers(ans);
+        setShowVideo(!!att.is_daily_challenge && !!DAILY_CHALLENGE_RESULT_VIDEO_URL);
       } catch (e) {
         console.error(e);
       } finally {
@@ -31,6 +37,19 @@ export default function Results() {
       }
     })();
   }, [attemptId]);
+
+  useEffect(() => {
+    const el = videoRef.current;
+    if (!el || !showVideo) return;
+    el.muted = muted;
+    // Best-effort autoplay (browsers require muted)
+    const p = el.play();
+    if (p && typeof p.catch === 'function') p.catch(() => {});
+  }, [showVideo, attempt?.id]);
+
+  useEffect(() => {
+    if (videoRef.current) videoRef.current.muted = muted;
+  }, [muted]);
 
   if (loading || !attempt) {
     return (
@@ -68,12 +87,13 @@ export default function Results() {
   });
 
   const weakTopic = weak[0];
+  const isDaily = !!attempt.is_daily_challenge;
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-6 sm:py-8 space-y-6 pb-28 sm:pb-8">
       <div className="text-center">
         <p className="text-sm text-[var(--muted-foreground)] mb-1">
-          {attempt.is_daily_challenge
+          {isDaily
             ? 'Daily Challenge'
             : attempt.mode === 'mock'
               ? 'Mock exam'
@@ -91,6 +111,59 @@ export default function Results() {
           <span>Incorrect: {attempt.total_questions - attempt.correct_count}</span>
         </div>
       </div>
+
+      {/* Daily Challenge only — muted autoplay + skip */}
+      {isDaily && showVideo && DAILY_CHALLENGE_RESULT_VIDEO_URL && (
+        <Card className="overflow-hidden">
+          <CardContent className="p-0 relative">
+            <video
+              ref={videoRef}
+              src={DAILY_CHALLENGE_RESULT_VIDEO_URL}
+              className="w-full max-h-[280px] sm:max-h-[360px] bg-black object-contain"
+              autoPlay
+              muted={muted}
+              playsInline
+              preload="auto"
+              controls={false}
+              onEnded={() => setShowVideo(false)}
+            />
+            <div className="absolute top-2 right-2 flex gap-2">
+              <button
+                type="button"
+                onClick={() => setMuted((m) => !m)}
+                className="rounded-full bg-black/60 text-white p-2 hover:bg-black/80"
+                aria-label={muted ? 'Unmute' : 'Mute'}
+              >
+                {muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  videoRef.current?.pause();
+                  setShowVideo(false);
+                }}
+                className="rounded-full bg-black/60 text-white p-2 hover:bg-black/80"
+                aria-label="Skip video"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="px-3 py-2 flex items-center justify-between gap-2 border-t border-[var(--border)]">
+              <p className="text-xs text-[var(--muted-foreground)]">Daily Challenge</p>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  videoRef.current?.pause();
+                  setShowVideo(false);
+                }}
+              >
+                Skip
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>
