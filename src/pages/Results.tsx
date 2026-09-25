@@ -9,7 +9,15 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { Spinner } from '@/components/ui/Spinner';
-import { Play } from 'lucide-react';
+
+/**
+ * Daily Challenge flow:
+ * 1) Score screen (View score)
+ * 2) User taps Continue → browser treats as gesture → video plays with sound
+ * 3) Video unskippable until ended
+ * 4) Full results unlock
+ */
+type DailyPhase = 'score' | 'video' | 'done';
 
 export default function Results() {
   const { attemptId } = useParams<{ attemptId: string }>();
@@ -18,10 +26,8 @@ export default function Results() {
   const [answers, setAnswers] = useState<(ExamAnswer & { question: Question })[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'correct' | 'incorrect' | 'flagged'>('all');
-  /** Blocks rest of results until Daily video finishes */
-  const [videoGate, setVideoGate] = useState(false);
-  const [needsTap, setNeedsTap] = useState(true);
-  const [playing, setPlaying] = useState(false);
+  const [dailyPhase, setDailyPhase] = useState<DailyPhase>('done');
+  const [videoError, setVideoError] = useState('');
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
   useEffect(() => {
@@ -31,9 +37,11 @@ export default function Results() {
         const [att, ans] = await Promise.all([getAttempt(attemptId), getAttemptAnswers(attemptId)]);
         setAttempt(att);
         setAnswers(ans);
-        const daily = !!att.is_daily_challenge && !!DAILY_CHALLENGE_RESULT_VIDEO_URL;
-        setVideoGate(daily);
-        setNeedsTap(daily);
+        if (att.is_daily_challenge && DAILY_CHALLENGE_RESULT_VIDEO_URL) {
+          setDailyPhase('score');
+        } else {
+          setDailyPhase('done');
+        }
       } catch (e) {
         console.error(e);
       } finally {
@@ -42,25 +50,38 @@ export default function Results() {
     })();
   }, [attemptId]);
 
-  const startVideoWithSound = async () => {
+  /** Called only from a button click so unmuted play is allowed. */
+  const continueToVideo = async () => {
+    setVideoError('');
+    setDailyPhase('video');
+    // Wait one frame so the video element is mounted
+    requestAnimationFrame(() => {
+      requestAnimationFrame(async () => {
+        const el = videoRef.current;
+        if (!el) return;
+        el.muted = false;
+        el.volume = 1;
+        try {
+          await el.play();
+        } catch (e) {
+          console.error(e);
+          setVideoError('Could not start with sound. Tap the video to try again.');
+        }
+      });
+    });
+  };
+
+  const retryPlay = async () => {
     const el = videoRef.current;
     if (!el) return;
+    setVideoError('');
     el.muted = false;
     el.volume = 1;
     try {
       await el.play();
-      setNeedsTap(false);
-      setPlaying(true);
-    } catch {
-      // Last resort: muted play (still unskippable)
-      el.muted = true;
-      try {
-        await el.play();
-        setNeedsTap(false);
-        setPlaying(true);
-      } catch (e) {
-        console.error(e);
-      }
+    } catch (e) {
+      console.error(e);
+      setVideoError('Playback blocked. Check volume and try once more.');
     }
   };
 
@@ -102,52 +123,64 @@ export default function Results() {
   const weakTopic = weak[0];
   const isDaily = !!attempt.is_daily_challenge;
 
-  return (
-    <div className="mx-auto max-w-3xl px-4 py-6 sm:py-8 space-y-6 pb-28 sm:pb-8 relative">
-      {/* Unskippable Daily Challenge video gate */}
-      {isDaily && videoGate && DAILY_CHALLENGE_RESULT_VIDEO_URL && (
-        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/95 px-4">
-          <p className="text-white text-sm mb-2 opacity-80">Daily Challenge complete</p>
-          <div className="text-white text-4xl font-bold mb-4 tabular-nums">
-            {attempt.correct_count}/{attempt.total_questions}{' '}
-            <span className="text-2xl font-semibold opacity-90">
-              ({formatPercent(Number(attempt.score_percent))})
-            </span>
-          </div>
-          <div className="relative w-full max-w-lg rounded-xl overflow-hidden bg-black shadow-2xl">
-            <video
-              ref={videoRef}
-              src={DAILY_CHALLENGE_RESULT_VIDEO_URL}
-              className="w-full max-h-[55vh] object-contain"
-              playsInline
-              preload="auto"
-              controls={false}
-              onEnded={() => {
-                setVideoGate(false);
-                setPlaying(false);
-              }}
-            />
-            {needsTap && (
-              <button
-                type="button"
-                onClick={startVideoWithSound}
-                className="absolute inset-0 flex flex-col items-center justify-center bg-black/50 text-white gap-3"
-              >
-                <span className="h-16 w-16 rounded-full bg-[var(--accent-color)] flex items-center justify-center shadow-lg">
-                  <Play className="h-8 w-8 fill-white text-white ml-1" />
-                </span>
-                <span className="text-sm font-medium">Tap to play</span>
-              </button>
-            )}
-          </div>
-          <p className="text-white/60 text-xs mt-4 text-center max-w-sm">
-            {playing
-              ? 'Watch until the end to continue…'
-              : 'Sound on — browsers require a tap before audio can play.'}
-          </p>
+  // —— Phase 1: View score (user gesture gateway) ——
+  if (isDaily && dailyPhase === 'score') {
+    return (
+      <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[var(--background)] px-6">
+        <p className="text-sm text-[var(--muted-foreground)] mb-2">Daily LET Challenge</p>
+        <h1 className="text-2xl font-bold mb-6">Your score</h1>
+        <div className="text-6xl font-bold text-[var(--accent-color)] tabular-nums">
+          {attempt.correct_count}
+          <span className="text-3xl text-[var(--muted-foreground)]">/{attempt.total_questions}</span>
         </div>
-      )}
+        <div className="text-2xl font-semibold mt-2">
+          {formatPercent(Number(attempt.score_percent))}
+        </div>
+        <p className="text-sm text-[var(--muted-foreground)] mt-8 mb-4 text-center max-w-xs">
+          Turn your volume up, then continue to watch your result clip.
+        </p>
+        <Button size="lg" className="min-h-12 px-10 text-base" onClick={continueToVideo}>
+          Continue
+        </Button>
+      </div>
+    );
+  }
 
+  // —— Phase 2: Unskippable video with sound ——
+  if (isDaily && dailyPhase === 'video' && DAILY_CHALLENGE_RESULT_VIDEO_URL) {
+    return (
+      <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black px-4">
+        <p className="text-white/70 text-sm mb-3">Daily Challenge</p>
+        <div className="w-full max-w-lg rounded-xl overflow-hidden bg-black">
+          <video
+            ref={videoRef}
+            src={DAILY_CHALLENGE_RESULT_VIDEO_URL}
+            className="w-full max-h-[70vh] object-contain"
+            playsInline
+            preload="auto"
+            controls={false}
+            onClick={retryPlay}
+            onEnded={() => setDailyPhase('done')}
+          />
+        </div>
+        {videoError ? (
+          <button
+            type="button"
+            onClick={retryPlay}
+            className="mt-4 text-sm text-white underline"
+          >
+            {videoError}
+          </button>
+        ) : (
+          <p className="text-white/50 text-xs mt-4">Watch until the end…</p>
+        )}
+      </div>
+    );
+  }
+
+  // —— Phase 3: Full results ——
+  return (
+    <div className="mx-auto max-w-3xl px-4 py-6 sm:py-8 space-y-6 pb-28 sm:pb-8">
       <div className="text-center">
         <p className="text-sm text-[var(--muted-foreground)] mb-1">
           {isDaily
