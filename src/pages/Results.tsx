@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { Spinner } from '@/components/ui/Spinner';
-import { Volume2, VolumeX, X } from 'lucide-react';
+import { Play } from 'lucide-react';
 
 export default function Results() {
   const { attemptId } = useParams<{ attemptId: string }>();
@@ -18,8 +18,10 @@ export default function Results() {
   const [answers, setAnswers] = useState<(ExamAnswer & { question: Question })[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'correct' | 'incorrect' | 'flagged'>('all');
-  const [showVideo, setShowVideo] = useState(true);
-  const [muted, setMuted] = useState(true);
+  /** Blocks rest of results until Daily video finishes */
+  const [videoGate, setVideoGate] = useState(false);
+  const [needsTap, setNeedsTap] = useState(true);
+  const [playing, setPlaying] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
   useEffect(() => {
@@ -29,7 +31,9 @@ export default function Results() {
         const [att, ans] = await Promise.all([getAttempt(attemptId), getAttemptAnswers(attemptId)]);
         setAttempt(att);
         setAnswers(ans);
-        setShowVideo(!!att.is_daily_challenge && !!DAILY_CHALLENGE_RESULT_VIDEO_URL);
+        const daily = !!att.is_daily_challenge && !!DAILY_CHALLENGE_RESULT_VIDEO_URL;
+        setVideoGate(daily);
+        setNeedsTap(daily);
       } catch (e) {
         console.error(e);
       } finally {
@@ -38,18 +42,27 @@ export default function Results() {
     })();
   }, [attemptId]);
 
-  useEffect(() => {
+  const startVideoWithSound = async () => {
     const el = videoRef.current;
-    if (!el || !showVideo) return;
-    el.muted = muted;
-    // Best-effort autoplay (browsers require muted)
-    const p = el.play();
-    if (p && typeof p.catch === 'function') p.catch(() => {});
-  }, [showVideo, attempt?.id]);
-
-  useEffect(() => {
-    if (videoRef.current) videoRef.current.muted = muted;
-  }, [muted]);
+    if (!el) return;
+    el.muted = false;
+    el.volume = 1;
+    try {
+      await el.play();
+      setNeedsTap(false);
+      setPlaying(true);
+    } catch {
+      // Last resort: muted play (still unskippable)
+      el.muted = true;
+      try {
+        await el.play();
+        setNeedsTap(false);
+        setPlaying(true);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+  };
 
   if (loading || !attempt) {
     return (
@@ -90,7 +103,51 @@ export default function Results() {
   const isDaily = !!attempt.is_daily_challenge;
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-6 sm:py-8 space-y-6 pb-28 sm:pb-8">
+    <div className="mx-auto max-w-3xl px-4 py-6 sm:py-8 space-y-6 pb-28 sm:pb-8 relative">
+      {/* Unskippable Daily Challenge video gate */}
+      {isDaily && videoGate && DAILY_CHALLENGE_RESULT_VIDEO_URL && (
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/95 px-4">
+          <p className="text-white text-sm mb-2 opacity-80">Daily Challenge complete</p>
+          <div className="text-white text-4xl font-bold mb-4 tabular-nums">
+            {attempt.correct_count}/{attempt.total_questions}{' '}
+            <span className="text-2xl font-semibold opacity-90">
+              ({formatPercent(Number(attempt.score_percent))})
+            </span>
+          </div>
+          <div className="relative w-full max-w-lg rounded-xl overflow-hidden bg-black shadow-2xl">
+            <video
+              ref={videoRef}
+              src={DAILY_CHALLENGE_RESULT_VIDEO_URL}
+              className="w-full max-h-[55vh] object-contain"
+              playsInline
+              preload="auto"
+              controls={false}
+              onEnded={() => {
+                setVideoGate(false);
+                setPlaying(false);
+              }}
+            />
+            {needsTap && (
+              <button
+                type="button"
+                onClick={startVideoWithSound}
+                className="absolute inset-0 flex flex-col items-center justify-center bg-black/50 text-white gap-3"
+              >
+                <span className="h-16 w-16 rounded-full bg-[var(--accent-color)] flex items-center justify-center shadow-lg">
+                  <Play className="h-8 w-8 fill-white text-white ml-1" />
+                </span>
+                <span className="text-sm font-medium">Tap to play</span>
+              </button>
+            )}
+          </div>
+          <p className="text-white/60 text-xs mt-4 text-center max-w-sm">
+            {playing
+              ? 'Watch until the end to continue…'
+              : 'Sound on — browsers require a tap before audio can play.'}
+          </p>
+        </div>
+      )}
+
       <div className="text-center">
         <p className="text-sm text-[var(--muted-foreground)] mb-1">
           {isDaily
@@ -111,59 +168,6 @@ export default function Results() {
           <span>Incorrect: {attempt.total_questions - attempt.correct_count}</span>
         </div>
       </div>
-
-      {/* Daily Challenge only — muted autoplay + skip */}
-      {isDaily && showVideo && DAILY_CHALLENGE_RESULT_VIDEO_URL && (
-        <Card className="overflow-hidden">
-          <CardContent className="p-0 relative">
-            <video
-              ref={videoRef}
-              src={DAILY_CHALLENGE_RESULT_VIDEO_URL}
-              className="w-full max-h-[280px] sm:max-h-[360px] bg-black object-contain"
-              autoPlay
-              muted={muted}
-              playsInline
-              preload="auto"
-              controls={false}
-              onEnded={() => setShowVideo(false)}
-            />
-            <div className="absolute top-2 right-2 flex gap-2">
-              <button
-                type="button"
-                onClick={() => setMuted((m) => !m)}
-                className="rounded-full bg-black/60 text-white p-2 hover:bg-black/80"
-                aria-label={muted ? 'Unmute' : 'Mute'}
-              >
-                {muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  videoRef.current?.pause();
-                  setShowVideo(false);
-                }}
-                className="rounded-full bg-black/60 text-white p-2 hover:bg-black/80"
-                aria-label="Skip video"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-            <div className="px-3 py-2 flex items-center justify-between gap-2 border-t border-[var(--border)]">
-              <p className="text-xs text-[var(--muted-foreground)]">Daily Challenge</p>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => {
-                  videoRef.current?.pause();
-                  setShowVideo(false);
-                }}
-              >
-                Skip
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       <Card>
         <CardHeader>
@@ -235,7 +239,11 @@ export default function Results() {
               Focus: {weakTopic.length > 18 ? weakTopic.slice(0, 18) + '…' : weakTopic}
             </Button>
           )}
-          <Button variant="ghost" className="w-full sm:w-auto min-h-11" onClick={() => navigate('/dashboard')}>
+          <Button
+            variant="ghost"
+            className="w-full sm:w-auto min-h-11"
+            onClick={() => navigate('/dashboard')}
+          >
             Dashboard
           </Button>
         </div>

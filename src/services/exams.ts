@@ -83,10 +83,12 @@ export async function completeAttempt(
 ): Promise<ExamResultSummary> {
   const { data: answers, error } = await supabase
     .from('exam_answers')
-    .select(`
+    .select(
+      `
       *,
       question:questions(*)
-    `)
+    `
+    )
     .eq('attempt_id', attemptId);
 
   if (error) throw error;
@@ -113,6 +115,7 @@ export async function completeAttempt(
 
   const isDaily = !!(attempt as ExamAttempt).is_daily_challenge;
 
+  // Critical path only — keep submit fast
   await updateStatsAfterAttempt(userId, typedAnswers);
   await recordActivity(userId, {
     questionsAnswered: total,
@@ -120,7 +123,9 @@ export async function completeAttempt(
     isMock: attempt.mode === 'mock',
     dailyChallenge: isDaily,
   });
-  await checkAchievements(userId);
+
+  // Achievements are heavy; do not block navigation / Results
+  void checkAchievements(userId).catch((e) => console.error('checkAchievements', e));
 
   const bySubject: Record<string, { correct: number; total: number; accuracy: number }> = {};
   const byTopic: Record<string, { correct: number; total: number; accuracy: number }> = {};
@@ -201,7 +206,9 @@ export async function startPractice(userId: string, config: PracticeConfig) {
   });
 
   if (questions.length === 0) {
-    throw new Error('No questions found matching your criteria. Try different filters or add more questions.');
+    throw new Error(
+      'No questions found matching your criteria. Try different filters or add more questions.'
+    );
   }
 
   const timeLimit = config.mode === 'mock' ? config.count * 90 : undefined;
