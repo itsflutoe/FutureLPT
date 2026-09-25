@@ -20,6 +20,13 @@ const CATEGORIES = [
   { id: 'MIXED' as const, label: 'Mixed' },
 ];
 
+const QUICK_STARTS: { cat: PracticeCategory; label: string; primary?: boolean }[] = [
+  { cat: 'PROFESSIONAL_EDUCATION', label: 'Professional Education', primary: true },
+  { cat: 'GENERAL_EDUCATION', label: 'General Education' },
+  { cat: 'SPECIALIZATION', label: 'Specialization' },
+  { cat: 'MIXED', label: 'Mixed (all categories)' },
+];
+
 export default function Practice() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -181,38 +188,23 @@ export default function Practice() {
         Quick session, or open options to fine-tune.
       </p>
 
-      {/* Quick start — primary path */}
       <div className="space-y-2 mb-6">
         <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">
           Quick start · 10 questions
         </p>
         <div className="grid gap-2">
-          <Button
-            className="w-full min-h-12 justify-between"
-            disabled={loading}
-            onClick={() => quickStart('PROFESSIONAL_EDUCATION')}
-          >
-            <span>Professional Education</span>
-            <span className="text-xs opacity-80">Start</span>
-          </Button>
-          <Button
-            variant="outline"
-            className="w-full min-h-12 justify-between"
-            disabled={loading}
-            onClick={() => quickStart('GENERAL_EDUCATION')}
-          >
-            <span>General Education</span>
-            <span className="text-xs opacity-80">Start</span>
-          </Button>
-          <Button
-            variant="outline"
-            className="w-full min-h-12 justify-between"
-            disabled={loading}
-            onClick={() => quickStart('MIXED')}
-          >
-            <span>Mixed (all categories)</span>
-            <span className="text-xs opacity-80">Start</span>
-          </Button>
+          {QUICK_STARTS.map((item) => (
+            <Button
+              key={item.cat}
+              variant={item.primary ? 'default' : 'outline'}
+              className="w-full min-h-12 justify-between"
+              disabled={loading}
+              onClick={() => quickStart(item.cat)}
+            >
+              <span>{item.label}</span>
+              <span className="text-xs opacity-80">Start</span>
+            </Button>
+          ))}
         </div>
       </div>
 
@@ -384,7 +376,6 @@ export default function Practice() {
         </CardContent>
       </Card>
 
-      {/* Sticky primary start for configured session */}
       <div
         className="fixed bottom-16 lg:bottom-0 inset-x-0 z-30 border-t border-[var(--border)] bg-[var(--card)]/95 backdrop-blur p-3 lg:static lg:border-0 lg:bg-transparent lg:p-0 lg:mt-4"
         style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
