@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { getSubjects, getTopics, getQuestionCount } from '@/services/questions';
-import { startPractice } from '@/services/exams';
+import { startPractice, startDailyChallenge } from '@/services/exams';
 import type { Difficulty, PracticeConfig, PracticeCategory } from '@/types';
 import { GEN_ED_SUBJECTS, PROF_ED_SUBJECTS } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
@@ -16,50 +16,88 @@ export default function Practice() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const [category, setCategory] = useState<PracticeCategory>((searchParams.get('category') as PracticeCategory) || 'PROFESSIONAL_EDUCATION');
+  const isDailyParam = searchParams.get('daily') === '1';
+
+  const [category, setCategory] = useState<PracticeCategory>(
+    (searchParams.get('category') as PracticeCategory) || 'PROFESSIONAL_EDUCATION'
+  );
   const [subject, setSubject] = useState(searchParams.get('subject') || '');
   const [topic, setTopic] = useState(searchParams.get('topic') || '');
-  const [count, setCount] = useState(20);
+  const [count, setCount] = useState(() => {
+    const c = parseInt(searchParams.get('count') || '', 10);
+    return c > 0 ? c : 20;
+  });
   const [customCount, setCustomCount] = useState('');
   const [difficulty, setDifficulty] = useState<Difficulty | 'MIXED'>('MIXED');
-  const [mode, setMode] = useState<'practice' | 'mock'>('practice');
+  const [mode, setMode] = useState<'practice' | 'mock'>(
+    searchParams.get('mode') === 'mock' ? 'mock' : 'practice'
+  );
   const [subjects, setSubjects] = useState<string[]>([]);
   const [topics, setTopics] = useState<string[]>([]);
   const [available, setAvailable] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
+  const [dailyBooting, setDailyBooting] = useState(isDailyParam);
   const [error, setError] = useState('');
+  const dailyStarted = useRef(false);
+
+  // Auto-start Daily LET Challenge when linked from Dashboard (?daily=1)
+  useEffect(() => {
+    if (!user || !isDailyParam || dailyStarted.current) return;
+    dailyStarted.current = true;
+    setDailyBooting(true);
+    setError('');
+    (async () => {
+      try {
+        const { attempt, questions } = await startDailyChallenge(user.id);
+        sessionStorage.setItem(`exam_${attempt.id}`, JSON.stringify(questions));
+        navigate(`/exam/${attempt.id}`, { replace: true });
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : 'Failed to start Daily Challenge.');
+        setDailyBooting(false);
+      }
+    })();
+  }, [user, isDailyParam, navigate]);
 
   useEffect(() => {
-    getSubjects(category).then(setSubjects).catch(() => setSubjects(
-      category === 'GENERAL_EDUCATION'
-        ? [...GEN_ED_SUBJECTS]
-        : category === 'PROFESSIONAL_EDUCATION'
-          ? [...PROF_ED_SUBJECTS]
-          : category === 'SPECIALIZATION'
-            ? ['Elementary Education']
-            : [...GEN_ED_SUBJECTS, ...PROF_ED_SUBJECTS, 'Elementary Education']
-    ));
+    if (isDailyParam) return;
+    getSubjects(category)
+      .then(setSubjects)
+      .catch(() =>
+        setSubjects(
+          category === 'GENERAL_EDUCATION'
+            ? [...GEN_ED_SUBJECTS]
+            : category === 'PROFESSIONAL_EDUCATION'
+              ? [...PROF_ED_SUBJECTS]
+              : category === 'SPECIALIZATION'
+                ? ['Elementary Education']
+                : [...GEN_ED_SUBJECTS, ...PROF_ED_SUBJECTS, 'Elementary Education']
+        )
+      );
     setSubject('');
     setTopic('');
-  }, [category]);
+  }, [category, isDailyParam]);
 
   useEffect(() => {
+    if (isDailyParam) return;
     if (subject) {
       getTopics(category, subject).then(setTopics).catch(() => setTopics([]));
     } else {
       setTopics([]);
       setTopic('');
     }
-  }, [category, subject]);
+  }, [category, subject, isDailyParam]);
 
   useEffect(() => {
+    if (isDailyParam) return;
     getQuestionCount({
       category,
       subject: subject || undefined,
       topic: topic || undefined,
       difficulty: difficulty === 'MIXED' ? undefined : difficulty,
-    }).then(setAvailable).catch(() => setAvailable(null));
-  }, [category, subject, topic, difficulty]);
+    })
+      .then(setAvailable)
+      .catch(() => setAvailable(null));
+  }, [category, subject, topic, difficulty, isDailyParam]);
 
   const handleStart = async () => {
     if (!user) return;
@@ -81,7 +119,6 @@ export default function Practice() {
         mode,
       };
       const { attempt, questions } = await startPractice(user.id, config);
-      // Store questions in sessionStorage for the exam page (avoids re-fetch)
       sessionStorage.setItem(`exam_${attempt.id}`, JSON.stringify(questions));
       navigate(`/exam/${attempt.id}`);
     } catch (err: unknown) {
@@ -90,6 +127,16 @@ export default function Practice() {
       setLoading(false);
     }
   };
+
+  if (isDailyParam && dailyBooting && !error) {
+    return (
+      <div className="mx-auto max-w-md px-4 py-24 text-center space-y-4">
+        <Spinner className="h-8 w-8 mx-auto" />
+        <h1 className="text-lg font-semibold">Starting Daily LET Challenge…</h1>
+        <p className="text-sm text-[var(--muted-foreground)]">10 mixed questions · practice mode</p>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-8">
@@ -101,7 +148,6 @@ export default function Practice() {
           <CardTitle className="text-base">Configure your session</CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
-          {/* Category */}
           <div>
             <label className="block text-sm font-medium mb-2">Category</label>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -111,7 +157,7 @@ export default function Practice() {
                   { id: 'PROFESSIONAL_EDUCATION' as const, label: 'Professional Education' },
                   { id: 'SPECIALIZATION' as const, label: 'Specialization' },
                   { id: 'MIXED' as const, label: 'Mixed (All)' },
-                ]
+                ] as const
               ).map((c) => (
                 <button
                   key={c.id}
@@ -129,7 +175,6 @@ export default function Practice() {
             </div>
           </div>
 
-          {/* Subject */}
           <div>
             <label className="block text-sm font-medium mb-2">Subject</label>
             <select
@@ -139,12 +184,13 @@ export default function Practice() {
             >
               <option value="">All subjects</option>
               {subjects.map((s) => (
-                <option key={s} value={s}>{s}</option>
+                <option key={s} value={s}>
+                  {s}
+                </option>
               ))}
             </select>
           </div>
 
-          {/* Topic */}
           {subject && (
             <div>
               <label className="block text-sm font-medium mb-2">Topic</label>
@@ -155,13 +201,14 @@ export default function Practice() {
               >
                 <option value="">All topics</option>
                 {topics.map((t) => (
-                  <option key={t} value={t}>{t}</option>
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
                 ))}
               </select>
             </div>
           )}
 
-          {/* Count */}
           <div>
             <label className="block text-sm font-medium mb-2">Number of questions</label>
             <div className="flex flex-wrap gap-2">
@@ -169,7 +216,10 @@ export default function Practice() {
                 <button
                   key={c}
                   type="button"
-                  onClick={() => { setCount(c); setCustomCount(''); }}
+                  onClick={() => {
+                    setCount(c);
+                    setCustomCount('');
+                  }}
                   className={`rounded-lg border px-3 py-1.5 text-sm ${
                     count === c && !customCount
                       ? 'border-[var(--accent-color)] bg-[var(--accent-color)]/10 text-[var(--accent-color)]'
@@ -196,7 +246,6 @@ export default function Practice() {
             )}
           </div>
 
-          {/* Difficulty */}
           <div>
             <label className="block text-sm font-medium mb-2">Difficulty</label>
             <div className="flex flex-wrap gap-2">
@@ -217,7 +266,6 @@ export default function Practice() {
             </div>
           </div>
 
-          {/* Mode */}
           <div>
             <label className="block text-sm font-medium mb-2">Mode</label>
             <div className="grid grid-cols-2 gap-2">
@@ -231,7 +279,9 @@ export default function Practice() {
                 }`}
               >
                 Practice Mode
-                <div className="text-xs font-normal text-[var(--muted-foreground)] mt-0.5">Explanations after each answer</div>
+                <div className="text-xs font-normal text-[var(--muted-foreground)] mt-0.5">
+                  Explanations after each answer
+                </div>
               </button>
               <button
                 type="button"
@@ -243,7 +293,9 @@ export default function Practice() {
                 }`}
               >
                 Mock Exam Mode
-                <div className="text-xs font-normal text-[var(--muted-foreground)] mt-0.5">Timed, no hints during exam</div>
+                <div className="text-xs font-normal text-[var(--muted-foreground)] mt-0.5">
+                  Timed, no hints during exam
+                </div>
               </button>
             </div>
           </div>
