@@ -137,7 +137,7 @@ export default function Results() {
           {formatPercent(Number(attempt.score_percent))}
         </div>
         <p className="text-sm text-[var(--muted-foreground)] mt-8 mb-4 text-center max-w-xs">
-          Turn your volume up, then continue to watch your result clip.
+          Click continue to see your progress.
         </p>
         <Button size="lg" className="min-h-12 px-10 text-base" onClick={continueToVideo}>
           Continue
