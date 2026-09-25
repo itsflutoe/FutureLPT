@@ -5,18 +5,28 @@ import { getSubjects, getTopics, getQuestionCount } from '@/services/questions';
 import { startPractice, startDailyChallenge } from '@/services/exams';
 import type { Difficulty, PracticeConfig, PracticeCategory } from '@/types';
 import { GEN_ED_SUBJECTS, PROF_ED_SUBJECTS } from '@/types';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
+import { Card, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Spinner } from '@/components/ui/Spinner';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 
-const COUNTS = [10, 20, 50, 100, 150];
+const COUNTS = [10, 20, 50];
 const DIFFICULTIES: (Difficulty | 'MIXED')[] = ['EASY', 'MODERATE', 'DIFFICULT', 'MIXED'];
+
+const CATEGORIES = [
+  { id: 'PROFESSIONAL_EDUCATION' as const, label: 'Professional Ed' },
+  { id: 'GENERAL_EDUCATION' as const, label: 'General Ed' },
+  { id: 'SPECIALIZATION' as const, label: 'Specialization' },
+  { id: 'MIXED' as const, label: 'Mixed' },
+];
 
 export default function Practice() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const isDailyParam = searchParams.get('daily') === '1';
+  const hasDeepLink =
+    !!(searchParams.get('category') || searchParams.get('subject') || searchParams.get('topic'));
 
   const [category, setCategory] = useState<PracticeCategory>(
     (searchParams.get('category') as PracticeCategory) || 'PROFESSIONAL_EDUCATION'
@@ -25,7 +35,7 @@ export default function Practice() {
   const [topic, setTopic] = useState(searchParams.get('topic') || '');
   const [count, setCount] = useState(() => {
     const c = parseInt(searchParams.get('count') || '', 10);
-    return c > 0 ? c : 20;
+    return c > 0 ? c : 10;
   });
   const [customCount, setCustomCount] = useState('');
   const [difficulty, setDifficulty] = useState<Difficulty | 'MIXED'>('MIXED');
@@ -38,9 +48,10 @@ export default function Practice() {
   const [loading, setLoading] = useState(false);
   const [dailyBooting, setDailyBooting] = useState(isDailyParam);
   const [error, setError] = useState('');
+  const [showAdvanced, setShowAdvanced] = useState(hasDeepLink || searchParams.get('mode') === 'mock');
   const dailyStarted = useRef(false);
+  const skipSubjectReset = useRef(true);
 
-  // Auto-start Daily LET Challenge when linked from Dashboard (?daily=1)
   useEffect(() => {
     if (!user || !isDailyParam || dailyStarted.current) return;
     dailyStarted.current = true;
@@ -73,8 +84,12 @@ export default function Practice() {
                 : [...GEN_ED_SUBJECTS, ...PROF_ED_SUBJECTS, 'Elementary Education']
         )
       );
-    setSubject('');
-    setTopic('');
+    if (skipSubjectReset.current) {
+      skipSubjectReset.current = false;
+    } else {
+      setSubject('');
+      setTopic('');
+    }
   }, [category, isDailyParam]);
 
   useEffect(() => {
@@ -128,6 +143,27 @@ export default function Practice() {
     }
   };
 
+  const quickStart = async (cat: PracticeCategory, n = 10) => {
+    if (!user) return;
+    setError('');
+    setLoading(true);
+    try {
+      const config: PracticeConfig = {
+        category: cat,
+        count: n,
+        difficulty: 'MIXED',
+        mode: 'practice',
+      };
+      const { attempt, questions } = await startPractice(user.id, config);
+      sessionStorage.setItem(`exam_${attempt.id}`, JSON.stringify(questions));
+      navigate(`/exam/${attempt.id}`);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to start practice.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (isDailyParam && dailyBooting && !error) {
     return (
       <div className="mx-auto max-w-md px-4 py-24 text-center space-y-4">
@@ -139,34 +175,61 @@ export default function Practice() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl px-4 py-8">
+    <div className="mx-auto max-w-lg px-4 py-6 sm:py-8 pb-28">
       <h1 className="text-2xl font-bold tracking-tight">Practice</h1>
-      <p className="text-[var(--muted-foreground)] mt-1 mb-8">Focus on what you need to improve.</p>
+      <p className="text-sm text-[var(--muted-foreground)] mt-1 mb-6">
+        Quick session, or open options to fine-tune.
+      </p>
+
+      {/* Quick start — primary path */}
+      <div className="space-y-2 mb-6">
+        <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">
+          Quick start · 10 questions
+        </p>
+        <div className="grid gap-2">
+          <Button
+            className="w-full min-h-12 justify-between"
+            disabled={loading}
+            onClick={() => quickStart('PROFESSIONAL_EDUCATION')}
+          >
+            <span>Professional Education</span>
+            <span className="text-xs opacity-80">Start</span>
+          </Button>
+          <Button
+            variant="outline"
+            className="w-full min-h-12 justify-between"
+            disabled={loading}
+            onClick={() => quickStart('GENERAL_EDUCATION')}
+          >
+            <span>General Education</span>
+            <span className="text-xs opacity-80">Start</span>
+          </Button>
+          <Button
+            variant="outline"
+            className="w-full min-h-12 justify-between"
+            disabled={loading}
+            onClick={() => quickStart('MIXED')}
+          >
+            <span>Mixed (all categories)</span>
+            <span className="text-xs opacity-80">Start</span>
+          </Button>
+        </div>
+      </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Configure your session</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent className="p-4 space-y-4">
           <div>
             <label className="block text-sm font-medium mb-2">Category</label>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {(
-                [
-                  { id: 'GENERAL_EDUCATION' as const, label: 'General Education' },
-                  { id: 'PROFESSIONAL_EDUCATION' as const, label: 'Professional Education' },
-                  { id: 'SPECIALIZATION' as const, label: 'Specialization' },
-                  { id: 'MIXED' as const, label: 'Mixed (All)' },
-                ] as const
-              ).map((c) => (
+            <div className="grid grid-cols-2 gap-2">
+              {CATEGORIES.map((c) => (
                 <button
                   key={c.id}
                   type="button"
                   onClick={() => setCategory(c.id)}
-                  className={`rounded-xl border px-4 py-3 text-sm font-medium transition-colors ${
+                  className={`rounded-xl border px-3 py-2.5 text-sm font-medium min-h-11 ${
                     category === c.id
                       ? 'border-[var(--accent-color)] bg-[var(--accent-color)]/10 text-[var(--accent-color)]'
-                      : 'border-[var(--border)] hover:bg-[var(--muted)]'
+                      : 'border-[var(--border)]'
                   }`}
                 >
                   {c.label}
@@ -176,41 +239,7 @@ export default function Practice() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-2">Subject</label>
-            <select
-              value={subject}
-              onChange={(e) => setSubject(e.target.value)}
-              className="w-full h-11 rounded-xl border border-[var(--border)] bg-[var(--background)] px-4 text-sm"
-            >
-              <option value="">All subjects</option>
-              {subjects.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {subject && (
-            <div>
-              <label className="block text-sm font-medium mb-2">Topic</label>
-              <select
-                value={topic}
-                onChange={(e) => setTopic(e.target.value)}
-                className="w-full h-11 rounded-xl border border-[var(--border)] bg-[var(--background)] px-4 text-sm"
-              >
-                <option value="">All topics</option>
-                {topics.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          <div>
-            <label className="block text-sm font-medium mb-2">Number of questions</label>
+            <label className="block text-sm font-medium mb-2">Questions</label>
             <div className="flex flex-wrap gap-2">
               {COUNTS.map((c) => (
                 <button
@@ -220,7 +249,7 @@ export default function Practice() {
                     setCount(c);
                     setCustomCount('');
                   }}
-                  className={`rounded-lg border px-3 py-1.5 text-sm ${
+                  className={`rounded-lg border px-4 py-2 text-sm min-h-10 ${
                     count === c && !customCount
                       ? 'border-[var(--accent-color)] bg-[var(--accent-color)]/10 text-[var(--accent-color)]'
                       : 'border-[var(--border)]'
@@ -236,84 +265,139 @@ export default function Practice() {
                 placeholder="Custom"
                 value={customCount}
                 onChange={(e) => setCustomCount(e.target.value)}
-                className="w-20 h-9 rounded-lg border border-[var(--border)] px-2 text-sm"
+                className="w-24 h-10 rounded-lg border border-[var(--border)] bg-[var(--background)] px-2 text-sm"
               />
             </div>
             {available !== null && (
               <p className="text-xs text-[var(--muted-foreground)] mt-2">
-                {available} questions available with current filters
+                {available} available with current filters
               </p>
             )}
           </div>
 
-          <div>
-            <label className="block text-sm font-medium mb-2">Difficulty</label>
-            <div className="flex flex-wrap gap-2">
-              {DIFFICULTIES.map((d) => (
-                <button
-                  key={d}
-                  type="button"
-                  onClick={() => setDifficulty(d)}
-                  className={`rounded-lg border px-3 py-1.5 text-sm capitalize ${
-                    difficulty === d
-                      ? 'border-[var(--accent-color)] bg-[var(--accent-color)]/10 text-[var(--accent-color)]'
-                      : 'border-[var(--border)]'
-                  }`}
-                >
-                  {d.toLowerCase()}
-                </button>
-              ))}
-            </div>
-          </div>
+          <button
+            type="button"
+            onClick={() => setShowAdvanced((v) => !v)}
+            className="flex w-full items-center justify-between text-sm font-medium text-[var(--muted-foreground)] py-1"
+          >
+            <span>More options</span>
+            {showAdvanced ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          </button>
 
-          <div>
-            <label className="block text-sm font-medium mb-2">Mode</label>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => setMode('practice')}
-                className={`rounded-xl border px-4 py-3 text-sm font-medium ${
-                  mode === 'practice'
-                    ? 'border-[var(--accent-color)] bg-[var(--accent-color)]/10 text-[var(--accent-color)]'
-                    : 'border-[var(--border)]'
-                }`}
-              >
-                Practice Mode
-                <div className="text-xs font-normal text-[var(--muted-foreground)] mt-0.5">
-                  Explanations after each answer
+          {showAdvanced && (
+            <div className="space-y-4 border-t border-[var(--border)] pt-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">Subject</label>
+                <select
+                  value={subject}
+                  onChange={(e) => setSubject(e.target.value)}
+                  className="w-full h-11 rounded-xl border border-[var(--border)] bg-[var(--background)] px-4 text-sm"
+                >
+                  <option value="">All subjects</option>
+                  {subjects.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {subject && (
+                <div>
+                  <label className="block text-sm font-medium mb-2">Topic</label>
+                  <select
+                    value={topic}
+                    onChange={(e) => setTopic(e.target.value)}
+                    className="w-full h-11 rounded-xl border border-[var(--border)] bg-[var(--background)] px-4 text-sm"
+                  >
+                    <option value="">All topics</option>
+                    {topics.map((t) => (
+                      <option key={t} value={t}>
+                        {t}
+                      </option>
+                    ))}
+                  </select>
                 </div>
-              </button>
-              <button
-                type="button"
-                onClick={() => setMode('mock')}
-                className={`rounded-xl border px-4 py-3 text-sm font-medium ${
-                  mode === 'mock'
-                    ? 'border-[var(--accent-color)] bg-[var(--accent-color)]/10 text-[var(--accent-color)]'
-                    : 'border-[var(--border)]'
-                }`}
-              >
-                Mock Exam Mode
-                <div className="text-xs font-normal text-[var(--muted-foreground)] mt-0.5">
-                  Timed, no hints during exam
+              )}
+
+              <div>
+                <label className="block text-sm font-medium mb-2">Difficulty</label>
+                <div className="flex flex-wrap gap-2">
+                  {DIFFICULTIES.map((d) => (
+                    <button
+                      key={d}
+                      type="button"
+                      onClick={() => setDifficulty(d)}
+                      className={`rounded-lg border px-3 py-2 text-sm capitalize min-h-10 ${
+                        difficulty === d
+                          ? 'border-[var(--accent-color)] bg-[var(--accent-color)]/10 text-[var(--accent-color)]'
+                          : 'border-[var(--border)]'
+                      }`}
+                    >
+                      {d.toLowerCase()}
+                    </button>
+                  ))}
                 </div>
-              </button>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">Mode</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setMode('practice')}
+                    className={`rounded-xl border px-3 py-3 text-sm font-medium min-h-11 ${
+                      mode === 'practice'
+                        ? 'border-[var(--accent-color)] bg-[var(--accent-color)]/10 text-[var(--accent-color)]'
+                        : 'border-[var(--border)]'
+                    }`}
+                  >
+                    Practice
+                    <div className="text-[10px] font-normal text-[var(--muted-foreground)] mt-0.5">
+                      With explanations
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMode('mock')}
+                    className={`rounded-xl border px-3 py-3 text-sm font-medium min-h-11 ${
+                      mode === 'mock'
+                        ? 'border-[var(--accent-color)] bg-[var(--accent-color)]/10 text-[var(--accent-color)]'
+                        : 'border-[var(--border)]'
+                    }`}
+                  >
+                    Timed mock
+                    <div className="text-[10px] font-normal text-[var(--muted-foreground)] mt-0.5">
+                      No hints
+                    </div>
+                  </button>
+                </div>
+              </div>
             </div>
-          </div>
+          )}
 
           {error && (
             <div className="rounded-xl bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 px-4 py-3 text-sm">
               {error}
             </div>
           )}
-
-          <Button className="w-full" size="lg" onClick={handleStart} disabled={loading}>
-            {loading ? <Spinner className="h-5 w-5" /> : 'Start'}
-          </Button>
         </CardContent>
       </Card>
 
-      <p className="text-xs text-center text-[var(--muted-foreground)] mt-6">
-        LET-style practice material. Not actual PRC examination questions.
+      {/* Sticky primary start for configured session */}
+      <div
+        className="fixed bottom-16 lg:bottom-0 inset-x-0 z-30 border-t border-[var(--border)] bg-[var(--card)]/95 backdrop-blur p-3 lg:static lg:border-0 lg:bg-transparent lg:p-0 lg:mt-4"
+        style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
+      >
+        <div className="mx-auto max-w-lg">
+          <Button className="w-full min-h-12" size="lg" onClick={handleStart} disabled={loading}>
+            {loading ? <Spinner className="h-5 w-5" /> : `Start ${customCount || count} questions`}
+          </Button>
+        </div>
+      </div>
+
+      <p className="text-xs text-center text-[var(--muted-foreground)] mt-6 lg:mt-4">
+        LET-style practice. Not actual PRC exam questions.
       </p>
     </div>
   );

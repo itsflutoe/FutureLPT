@@ -10,13 +10,6 @@ import { Badge } from '@/components/ui/Badge';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { Spinner } from '@/components/ui/Spinner';
 
-/**
- * Daily Challenge flow:
- * 1) Score screen (View score)
- * 2) User taps Continue → browser treats as gesture → video plays with sound
- * 3) Video unskippable until ended
- * 4) Full results unlock
- */
 type DailyPhase = 'score' | 'video' | 'done';
 
 export default function Results() {
@@ -25,9 +18,10 @@ export default function Results() {
   const [attempt, setAttempt] = useState<ExamAttempt | null>(null);
   const [answers, setAnswers] = useState<(ExamAnswer & { question: Question })[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<'all' | 'correct' | 'incorrect' | 'flagged'>('all');
+  const [filter, setFilter] = useState<'all' | 'correct' | 'incorrect' | 'flagged'>('incorrect');
   const [dailyPhase, setDailyPhase] = useState<DailyPhase>('done');
   const [videoError, setVideoError] = useState('');
+  const [showSubjects, setShowSubjects] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
   useEffect(() => {
@@ -37,6 +31,8 @@ export default function Results() {
         const [att, ans] = await Promise.all([getAttempt(attemptId), getAttemptAnswers(attemptId)]);
         setAttempt(att);
         setAnswers(ans);
+        const wrong = ans.filter((a) => a.is_correct === false).length;
+        setFilter(wrong > 0 ? 'incorrect' : 'all');
         if (att.is_daily_challenge && DAILY_CHALLENGE_RESULT_VIDEO_URL) {
           setDailyPhase('score');
         } else {
@@ -50,11 +46,9 @@ export default function Results() {
     })();
   }, [attemptId]);
 
-  /** Called only from a button click so unmuted play is allowed. */
   const continueToVideo = async () => {
     setVideoError('');
     setDailyPhase('video');
-    // Wait one frame so the video element is mounted
     requestAnimationFrame(() => {
       requestAnimationFrame(async () => {
         const el = videoRef.current;
@@ -113,6 +107,10 @@ export default function Results() {
     .slice(0, 3)
     .map(([k]) => k);
 
+  const incorrectCount = answers.filter((a) => a.is_correct === false).length;
+  const correctCount = answers.filter((a) => a.is_correct === true).length;
+  const flaggedCount = answers.filter((a) => a.is_flagged).length;
+
   const filtered = answers.filter((a) => {
     if (filter === 'correct') return a.is_correct === true;
     if (filter === 'incorrect') return a.is_correct === false;
@@ -123,7 +121,6 @@ export default function Results() {
   const weakTopic = weak[0];
   const isDaily = !!attempt.is_daily_challenge;
 
-  // —— Phase 1: View score (user gesture gateway) ——
   if (isDaily && dailyPhase === 'score') {
     return (
       <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[var(--background)] px-6">
@@ -137,7 +134,7 @@ export default function Results() {
           {formatPercent(Number(attempt.score_percent))}
         </div>
         <p className="text-sm text-[var(--muted-foreground)] mt-8 mb-4 text-center max-w-xs">
-          Click continue to see your progress.
+          Continue to see your progress clip.
         </p>
         <Button size="lg" className="min-h-12 px-10 text-base" onClick={continueToVideo}>
           Continue
@@ -146,7 +143,6 @@ export default function Results() {
     );
   }
 
-  // —— Phase 2: Unskippable video with sound ——
   if (isDaily && dailyPhase === 'video' && DAILY_CHALLENGE_RESULT_VIDEO_URL) {
     return (
       <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black px-4">
@@ -164,11 +160,7 @@ export default function Results() {
           />
         </div>
         {videoError ? (
-          <button
-            type="button"
-            onClick={retryPlay}
-            className="mt-4 text-sm text-white underline"
-          >
+          <button type="button" onClick={retryPlay} className="mt-4 text-sm text-white underline">
             {videoError}
           </button>
         ) : (
@@ -178,7 +170,6 @@ export default function Results() {
     );
   }
 
-  // —— Phase 3: Full results ——
   return (
     <div className="mx-auto max-w-3xl px-4 py-6 sm:py-8 space-y-6 pb-28 sm:pb-8">
       <div className="text-center">
@@ -189,73 +180,155 @@ export default function Results() {
               ? 'Mock exam'
               : 'Practice'}
         </p>
-        <h1 className="text-2xl font-bold">Your Result</h1>
-        <div className="mt-4 text-5xl font-bold text-[var(--accent-color)]">
-          {attempt.correct_count} / {attempt.total_questions}
+        <h1 className="text-2xl font-bold">Your result</h1>
+        <div className="mt-4 text-5xl font-bold text-[var(--accent-color)] tabular-nums">
+          {attempt.correct_count}/{attempt.total_questions}
         </div>
-        <div className="text-3xl font-semibold mt-1">
+        <div className="text-2xl font-semibold mt-1">
           {formatPercent(Number(attempt.score_percent))}
         </div>
-        <div className="flex justify-center gap-6 mt-4 text-sm text-[var(--muted-foreground)]">
-          <span>Correct: {attempt.correct_count}</span>
-          <span>Incorrect: {attempt.total_questions - attempt.correct_count}</span>
+        {incorrectCount > 0 && (
+          <p className="text-sm text-[var(--muted-foreground)] mt-3">
+            {incorrectCount} to review below
+          </p>
+        )}
+      </div>
+
+      {/* Primary: learn from mistakes first */}
+      <div>
+        <h2 className="text-lg font-semibold mb-3">Review</h2>
+        <div className="flex gap-2 mb-4 flex-wrap">
+          {(
+            [
+              { id: 'incorrect' as const, label: `Missed (${incorrectCount})` },
+              { id: 'all' as const, label: `All (${answers.length})` },
+              { id: 'correct' as const, label: `Correct (${correctCount})` },
+              { id: 'flagged' as const, label: `Flagged (${flaggedCount})` },
+            ] as const
+          ).map((f) => (
+            <button
+              key={f.id}
+              type="button"
+              onClick={() => setFilter(f.id)}
+              className={`rounded-lg px-3 py-1.5 text-sm border min-h-9 ${
+                filter === f.id
+                  ? 'border-[var(--accent-color)] bg-[var(--accent-color)]/10'
+                  : 'border-[var(--border)]'
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+        <div className="space-y-3">
+          {filtered.length === 0 ? (
+            <p className="text-sm text-[var(--muted-foreground)] py-4">
+              {filter === 'incorrect' ? 'No missed questions — nice work.' : 'Nothing in this filter.'}
+            </p>
+          ) : (
+            filtered.map((a, idx) => (
+              <Card key={a.id}>
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2 mb-2 flex-wrap">
+                    <span className="text-xs text-[var(--muted-foreground)]">#{idx + 1}</span>
+                    <Badge variant={a.is_correct ? 'success' : 'error'}>
+                      {a.is_correct ? 'Correct' : 'Incorrect'}
+                    </Badge>
+                    <span className="text-xs text-[var(--muted-foreground)]">
+                      {a.question?.topic || a.question?.subject}
+                    </span>
+                  </div>
+                  <p className="text-sm font-medium mb-2 leading-relaxed">{a.question?.question}</p>
+                  <div className="text-sm space-y-1">
+                    <p>
+                      Your answer:{' '}
+                      <strong className={a.is_correct ? '' : 'text-red-600 dark:text-red-400'}>
+                        {a.selected_answer || '—'}
+                      </strong>
+                    </p>
+                    {!a.is_correct && (
+                      <p>
+                        Correct: <strong className="text-green-700 dark:text-green-400">{a.correct_answer}</strong>
+                      </p>
+                    )}
+                  </div>
+                  {a.question?.explanation && (
+                    <p className="text-sm text-[var(--muted-foreground)] mt-3 leading-relaxed border-t border-[var(--border)] pt-3">
+                      {a.question.explanation}
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+            ))
+          )}
         </div>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Performance by subject</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {sorted.map(([name, v]) => (
-            <div key={name}>
-              <div className="flex justify-between text-sm mb-1">
-                <span className="truncate pr-2">{name}</span>
-                <span className="shrink-0">{formatPercent((v.correct / v.total) * 100)}</span>
-              </div>
-              <ProgressBar value={(v.correct / v.total) * 100} />
+      {/* Secondary: performance summary — collapsed by default on long reviews */}
+      <div>
+        <button
+          type="button"
+          onClick={() => setShowSubjects((v) => !v)}
+          className="text-sm font-medium text-[var(--accent-color)]"
+        >
+          {showSubjects ? 'Hide subject breakdown' : 'Show subject breakdown'}
+        </button>
+        {showSubjects && (
+          <div className="mt-3 space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">By subject</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {sorted.map(([name, v]) => (
+                  <div key={name}>
+                    <div className="flex justify-between text-sm mb-1 gap-2">
+                      <span className="truncate">{name}</span>
+                      <span className="shrink-0 tabular-nums">
+                        {formatPercent((v.correct / v.total) * 100)}
+                      </span>
+                    </div>
+                    <ProgressBar value={(v.correct / v.total) * 100} />
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Strongest</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {strongest.length === 0 ? (
+                    <p className="text-sm text-[var(--muted-foreground)]">Keep practicing.</p>
+                  ) : (
+                    <ul className="space-y-1 text-sm">
+                      {strongest.map((s) => (
+                        <li key={s}>• {s}</li>
+                      ))}
+                    </ul>
+                  )}
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Needs work</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {weak.length === 0 ? (
+                    <p className="text-sm text-[var(--muted-foreground)]">Balanced session.</p>
+                  ) : (
+                    <ul className="space-y-1 text-sm">
+                      {weak.map((s) => (
+                        <li key={s}>• {s}</li>
+                      ))}
+                    </ul>
+                  )}
+                </CardContent>
+              </Card>
             </div>
-          ))}
-        </CardContent>
-      </Card>
-
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Strongest</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {strongest.length === 0 ? (
-              <p className="text-sm text-[var(--muted-foreground)]">Keep practicing!</p>
-            ) : (
-              <ul className="space-y-1">
-                {strongest.map((s) => (
-                  <li key={s} className="text-sm">
-                    • {s}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Needs improvement</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {weak.length === 0 ? (
-              <p className="text-sm text-[var(--muted-foreground)]">Great work across the board.</p>
-            ) : (
-              <ul className="space-y-1">
-                {weak.map((s) => (
-                  <li key={s} className="text-sm">
-                    • {s}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
+          </div>
+        )}
       </div>
 
       <div className="fixed bottom-0 inset-x-0 z-20 border-t border-[var(--border)] bg-[var(--card)]/95 backdrop-blur p-3 sm:static sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-none">
@@ -269,7 +342,7 @@ export default function Results() {
               className="w-full sm:w-auto min-h-11"
               onClick={() => navigate(`/practice?subject=${encodeURIComponent(weakTopic)}`)}
             >
-              Focus: {weakTopic.length > 18 ? weakTopic.slice(0, 18) + '…' : weakTopic}
+              Focus weak area
             </Button>
           )}
           <Button
@@ -279,47 +352,6 @@ export default function Results() {
           >
             Dashboard
           </Button>
-        </div>
-      </div>
-
-      <div>
-        <h2 className="text-lg font-semibold mb-3">Review answers</h2>
-        <div className="flex gap-2 mb-4 flex-wrap">
-          {(['all', 'correct', 'incorrect', 'flagged'] as const).map((f) => (
-            <button
-              key={f}
-              onClick={() => setFilter(f)}
-              className={`rounded-lg px-3 py-1.5 text-sm capitalize border min-h-9 ${
-                filter === f
-                  ? 'border-[var(--accent-color)] bg-[var(--accent-color)]/10'
-                  : 'border-[var(--border)]'
-              }`}
-            >
-              {f}
-            </button>
-          ))}
-        </div>
-        <div className="space-y-4">
-          {filtered.map((a) => (
-            <Card key={a.id}>
-              <CardContent className="p-4">
-                <div className="flex items-center gap-2 mb-2 flex-wrap">
-                  <Badge variant={a.is_correct ? 'success' : 'error'}>
-                    {a.is_correct ? 'Correct' : 'Incorrect'}
-                  </Badge>
-                  <span className="text-xs text-[var(--muted-foreground)]">{a.question?.subject}</span>
-                </div>
-                <p className="text-sm font-medium mb-2">{a.question?.question}</p>
-                <p className="text-sm">
-                  Your answer: <strong>{a.selected_answer || '—'}</strong> · Correct:{' '}
-                  <strong>{a.correct_answer}</strong>
-                </p>
-                {a.question?.explanation && (
-                  <p className="text-sm text-[var(--muted-foreground)] mt-2">{a.question.explanation}</p>
-                )}
-              </CardContent>
-            </Card>
-          ))}
         </div>
       </div>
     </div>
