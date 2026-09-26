@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getAttempt, getAttemptAnswers } from '@/services/exams';
+import { useAuth } from '@/hooks/useAuth';
+import { getAttempt, getAttemptAnswers, startPracticeFromQuestionIds } from '@/services/exams';
 import type { ExamAttempt, ExamAnswer, Question } from '@/types';
+import { MISTAKES_SESSION_SIZE } from '@/types';
 import { formatPercent } from '@/lib/utils';
 import { DAILY_CHALLENGE_RESULT_VIDEO_URL } from '@/config/media';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
@@ -15,6 +17,7 @@ type DailyPhase = 'score' | 'video' | 'done';
 export default function Results() {
   const { attemptId } = useParams<{ attemptId: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [attempt, setAttempt] = useState<ExamAttempt | null>(null);
   const [answers, setAnswers] = useState<(ExamAnswer & { question: Question })[]>([]);
   const [loading, setLoading] = useState(true);
@@ -22,6 +25,8 @@ export default function Results() {
   const [dailyPhase, setDailyPhase] = useState<DailyPhase>('done');
   const [videoError, setVideoError] = useState('');
   const [showSubjects, setShowSubjects] = useState(false);
+  const [focusLoading, setFocusLoading] = useState(false);
+  const [focusError, setFocusError] = useState('');
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
   useEffect(() => {
@@ -79,6 +84,29 @@ export default function Results() {
     }
   };
 
+  const handleFocusWeakArea = async () => {
+    if (!user || focusLoading) return;
+    const wrongIds = answers
+      .filter((a) => a.is_correct === false)
+      .map((a) => a.question_id)
+      .filter(Boolean);
+    if (wrongIds.length === 0) return;
+    setFocusError('');
+    setFocusLoading(true);
+    try {
+      const { attempt: att, questions } = await startPracticeFromQuestionIds(
+        user.id,
+        wrongIds,
+        MISTAKES_SESSION_SIZE
+      );
+      sessionStorage.setItem(`exam_${att.id}`, JSON.stringify(questions));
+      navigate(`/exam/${att.id}`);
+    } catch (err: unknown) {
+      setFocusError(err instanceof Error ? err.message : 'Could not start focus session.');
+      setFocusLoading(false);
+    }
+  };
+
   if (loading || !attempt) {
     return (
       <div className="flex justify-center py-32">
@@ -118,8 +146,8 @@ export default function Results() {
     return true;
   });
 
-  const weakTopic = weak[0];
   const isDaily = !!attempt.is_daily_challenge;
+  const focusCount = Math.min(MISTAKES_SESSION_SIZE, incorrectCount);
 
   if (isDaily && dailyPhase === 'score') {
     return (
@@ -194,7 +222,6 @@ export default function Results() {
         )}
       </div>
 
-      {/* Primary: learn from mistakes first */}
       <div>
         <h2 className="text-lg font-semibold mb-3">Review</h2>
         <div className="flex gap-2 mb-4 flex-wrap">
@@ -248,7 +275,8 @@ export default function Results() {
                     </p>
                     {!a.is_correct && (
                       <p>
-                        Correct: <strong className="text-green-700 dark:text-green-400">{a.correct_answer}</strong>
+                        Correct:{' '}
+                        <strong className="text-green-700 dark:text-green-400">{a.correct_answer}</strong>
                       </p>
                     )}
                   </div>
@@ -264,7 +292,6 @@ export default function Results() {
         </div>
       </div>
 
-      {/* Secondary: performance summary — collapsed by default on long reviews */}
       <div>
         <button
           type="button"
@@ -331,18 +358,30 @@ export default function Results() {
         )}
       </div>
 
+      {focusError && (
+        <p className="text-sm text-center text-red-600 dark:text-red-400">{focusError}</p>
+      )}
+
       <div className="fixed bottom-0 inset-x-0 z-20 border-t border-[var(--border)] bg-[var(--card)]/95 backdrop-blur p-3 sm:static sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-none">
         <div className="mx-auto max-w-3xl flex flex-col sm:flex-row gap-2 sm:justify-center">
           <Button className="w-full sm:w-auto min-h-11" onClick={() => navigate('/practice')}>
             Practice again
           </Button>
-          {weakTopic && (
+          {incorrectCount > 0 && (
             <Button
               variant="outline"
               className="w-full sm:w-auto min-h-11"
-              onClick={() => navigate(`/practice?subject=${encodeURIComponent(weakTopic)}`)}
+              disabled={focusLoading}
+              onClick={handleFocusWeakArea}
             >
-              Focus weak area
+              {focusLoading ? (
+                <span className="inline-flex items-center gap-2">
+                  <Spinner className="h-4 w-4" />
+                  Starting…
+                </span>
+              ) : (
+                `Focus weak area (${focusCount})`
+              )}
             </Button>
           )}
           <Button
