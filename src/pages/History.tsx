@@ -3,17 +3,12 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { getUserHistory } from '@/services/exams';
 import type { ExamAttempt } from '@/types';
-import { formatPercent } from '@/lib/utils';
+import { formatPercent, formatSessionTitle, formatMode } from '@/lib/utils';
 import { format } from 'date-fns';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Spinner } from '@/components/ui/Spinner';
 import { Button } from '@/components/ui/Button';
-
-function sessionTitle(h: ExamAttempt): string {
-  if (h.is_daily_challenge) return 'Daily Challenge';
-  return h.subject || h.category?.replace(/_/g, ' ') || 'Mixed';
-}
 
 export default function History() {
   const { user } = useAuth();
@@ -54,9 +49,9 @@ export default function History() {
               <Card className="hover:bg-[var(--muted)]/30 transition-colors">
                 <CardContent className="p-4 flex items-center justify-between gap-3">
                   <div className="min-w-0">
-                    <div className="font-medium text-sm truncate">{sessionTitle(h)}</div>
+                    <div className="font-medium text-sm truncate">{formatSessionTitle(h)}</div>
                     <div className="text-xs text-[var(--muted-foreground)]">
-                      {h.total_questions} Q · {h.mode}
+                      {h.total_questions} Q · {formatMode(h.mode)}
                       {h.completed_at
                         ? ` · ${format(new Date(h.completed_at), 'MMM d, yyyy')}`
                         : ''}

@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { getOverallStats, getRecommendations, getSubjectPerformance } from '@/services/progress';
 import { getUserHistory, hasCompletedDailyChallengeToday } from '@/services/exams';
-import { getGreeting, formatPercent } from '@/lib/utils';
+import { getGreeting, formatPercent, formatSessionTitle, formatMode } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { ProgressBar } from '@/components/ui/ProgressBar';
@@ -233,7 +233,7 @@ export default function Dashboard() {
               {history.map((h) => (
                 <Link
                   key={h.id}
-                  to={`/history/${h.id}`}
+                  to={`/results/${h.id}`}
                   className="flex items-center justify-between rounded-xl border border-[var(--border)] p-3 hover:bg-[var(--muted)]/50 transition-colors min-w-0"
                 >
                   <div className="flex items-center gap-3 min-w-0">
@@ -243,19 +243,19 @@ export default function Dashboard() {
                       <BookOpen className="h-4 w-4 text-[var(--muted-foreground)] shrink-0" aria-hidden />
                     )}
                     <div className="min-w-0">
-                      <div className="text-sm font-medium truncate">
-                        {h.is_daily_challenge
-                          ? 'Daily Challenge'
-                          : h.subject || h.category || 'Mixed'}
-                      </div>
+                      <div className="text-sm font-medium truncate">{formatSessionTitle(h)}</div>
                       <div className="text-xs text-[var(--muted-foreground)]">
-                        {h.total_questions} Q · {h.mode}
+                        {h.total_questions} Q · {formatMode(h.mode)}
                       </div>
                     </div>
                   </div>
                   <Badge
                     variant={
-                      h.score_percent >= 75 ? 'success' : h.score_percent >= 50 ? 'warning' : 'error'
+                      Number(h.score_percent) >= 75
+                        ? 'success'
+                        : Number(h.score_percent) >= 50
+                          ? 'warning'
+                          : 'error'
                     }
                   >
                     {formatPercent(Number(h.score_percent))}
