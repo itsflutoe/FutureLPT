@@ -34,3 +34,38 @@ export function calculateMastery(attempts: number, correct: number): import('../
   if (attempts >= 2 && accuracy >= 0.5) return 'improving';
   return 'learning';
 }
+
+/** Student-facing category labels (not raw DB enums). */
+export function formatCategory(category: string | null | undefined): string {
+  if (!category) return 'Mixed';
+  switch (category) {
+    case 'GENERAL_EDUCATION':
+      return 'General Education';
+    case 'PROFESSIONAL_EDUCATION':
+      return 'Professional Education';
+    case 'SPECIALIZATION':
+      return 'Specialization';
+    case 'MIXED':
+      return 'Mixed';
+    default:
+      return category.replace(/_/g, ' ');
+  }
+}
+
+export function formatMode(mode: string | null | undefined): string {
+  if (!mode) return '';
+  if (mode === 'practice') return 'Practice';
+  if (mode === 'mock') return 'Mock';
+  return mode.charAt(0).toUpperCase() + mode.slice(1);
+}
+
+/** Title for history / dashboard recent rows. */
+export function formatSessionTitle(h: {
+  is_daily_challenge?: boolean | null;
+  subject?: string | null;
+  category?: string | null;
+}): string {
+  if (h.is_daily_challenge) return 'Daily Challenge';
+  if (h.subject) return h.subject;
+  return formatCategory(h.category);
+}

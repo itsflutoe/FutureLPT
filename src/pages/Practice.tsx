@@ -59,6 +59,9 @@ export default function Practice() {
   const dailyStarted = useRef(false);
   const skipSubjectReset = useRef(true);
 
+  const noQuestions = available === 0;
+  const finalCount = customCount ? parseInt(customCount, 10) : count;
+
   useEffect(() => {
     if (!user || !isDailyParam || dailyStarted.current) return;
     dailyStarted.current = true;
@@ -124,8 +127,11 @@ export default function Practice() {
   const handleStart = async () => {
     if (!user) return;
     setError('');
+    if (noQuestions) {
+      setError('No questions match these filters. Change category, subject, or topic.');
+      return;
+    }
     setLoading(true);
-    const finalCount = customCount ? parseInt(customCount, 10) : count;
     if (!finalCount || finalCount < 1) {
       setError('Please select a valid number of questions.');
       setLoading(false);
@@ -261,8 +267,16 @@ export default function Practice() {
               />
             </div>
             {available !== null && (
-              <p className="text-xs text-[var(--muted-foreground)] mt-2">
-                {available} available with current filters
+              <p
+                className={`text-xs mt-2 ${
+                  noQuestions
+                    ? 'text-amber-700 dark:text-amber-400 font-medium'
+                    : 'text-[var(--muted-foreground)]'
+                }`}
+              >
+                {noQuestions
+                  ? 'No questions match these filters. Try another category, subject, or topic.'
+                  : `${available} available with current filters`}
               </p>
             )}
           </div>
@@ -381,8 +395,19 @@ export default function Practice() {
         style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
       >
         <div className="mx-auto max-w-lg">
-          <Button className="w-full min-h-12" size="lg" onClick={handleStart} disabled={loading}>
-            {loading ? <Spinner className="h-5 w-5" /> : `Start ${customCount || count} questions`}
+          <Button
+            className="w-full min-h-12"
+            size="lg"
+            onClick={handleStart}
+            disabled={loading || noQuestions}
+          >
+            {loading ? (
+              <Spinner className="h-5 w-5" />
+            ) : noQuestions ? (
+              'No questions available'
+            ) : (
+              `Start ${finalCount || count} questions`
+            )}
           </Button>
         </div>
       </div>
