@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase';
-import type { ExamAnswer, Question, UserTopicStat } from '@/types';
+import type { ExamAnswer, Question, UserTopicStat, MasteryStatus } from '@/types';
 import { calculateMastery } from '@/lib/utils';
 
 /**
@@ -39,7 +39,6 @@ export async function updateStatsAfterAttempt(
 
   const now = new Date().toISOString();
 
-  // One row per question answered in this attempt
   const qUpserts = answered.map((a) => {
     const ex = qMap.get(a.question_id);
     const attempts = (ex?.attempts || 0) + 1;
@@ -54,7 +53,6 @@ export async function updateStatsAfterAttempt(
     };
   });
 
-  // Aggregate topic deltas (multiple Qs can share a topic)
   const topicDeltas = new Map<
     string,
     { category: string; subject: string; topic: string; addAttempts: number; addCorrect: number }
@@ -91,7 +89,6 @@ export async function updateStatsAfterAttempt(
     };
   });
 
-  // Two batch writes (not N sequential)
   const [qRes, tRes] = await Promise.all([
     supabase.from('user_question_stats').upsert(qUpserts, {
       onConflict: 'user_id,question_id',
@@ -162,19 +159,60 @@ export async function getRecommendations(userId: string) {
   return recs.slice(0, 5);
 }
 
-export async function getMistakes(userId: string, limit = 50) {
+/** Still in mistakes queue until strong/mastered (strict mastery). */
+function stillInMistakesQueue(s: {
+  attempts: number;
+  correct_count: number;
+  mastery_status?: MasteryStatus | string | null;
+}): boolean {
+  if (s.attempts <= 0) return false;
+  if (s.correct_count >= s.attempts) return false; // never wrong overall
+  const m = s.mastery_status || 'learning';
+  if (m === 'strong' || m === 'mastered') return false;
+  return true;
+}
+
+/**
+ * Mistakes queue for UI + practice sampling.
+ * Prefer most often missed, then most recent.
+ */
+export async function getMistakes(userId: string, limit = 100) {
   const { data: stats } = await supabase
     .from('user_question_stats')
     .select('*, question:questions(*)')
     .eq('user_id', userId)
     .gt('attempts', 0)
     .order('last_attempted_at', { ascending: false })
-    .limit(100);
+    .limit(300);
 
-  const mistakes = (stats || []).filter(
-    (s: { attempts: number; correct_count: number }) => s.correct_count < s.attempts
-  );
+  const mistakes = (stats || [])
+    .filter((s: { attempts: number; correct_count: number; mastery_status?: string }) =>
+      stillInMistakesQueue(s)
+    )
+    .filter((s: { question?: { is_active?: boolean } | null }) => s.question?.is_active !== false)
+    .sort(
+      (
+        a: { attempts: number; correct_count: number; last_attempted_at?: string | null },
+        b: { attempts: number; correct_count: number; last_attempted_at?: string | null }
+      ) => {
+        const missA = a.attempts - a.correct_count;
+        const missB = b.attempts - b.correct_count;
+        if (missB !== missA) return missB - missA;
+        const ta = a.last_attempted_at ? new Date(a.last_attempted_at).getTime() : 0;
+        const tb = b.last_attempted_at ? new Date(b.last_attempted_at).getTime() : 0;
+        return tb - ta;
+      }
+    );
+
   return mistakes.slice(0, limit);
+}
+
+/** Question IDs still in the mistakes queue (active questions only). */
+export async function getMistakeQuestionIds(userId: string): Promise<string[]> {
+  const items = await getMistakes(userId, 200);
+  return items
+    .map((m: { question_id: string; question?: { id?: string; is_active?: boolean } }) => m.question_id)
+    .filter(Boolean);
 }
 
 export async function getSubjectPerformance(userId: string) {

@@ -195,3 +195,6 @@ export const ACCENT_COLORS: Record<AccentColor, string> = {
 
 /** Fixed size for the Daily LET Challenge */
 export const DAILY_CHALLENGE_COUNT = 10;
+
+/** Max questions per mistakes / focus-weak session */
+export const MISTAKES_SESSION_SIZE = 20;

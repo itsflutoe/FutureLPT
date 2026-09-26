@@ -1,10 +1,18 @@
 import { supabase } from '@/lib/supabase';
 import type { ExamAttempt, ExamAnswer, PracticeConfig, Question, ExamResultSummary } from '@/types';
-import { DAILY_CHALLENGE_COUNT } from '@/types';
-import { fetchQuestions } from './questions';
+import { DAILY_CHALLENGE_COUNT, MISTAKES_SESSION_SIZE } from '@/types';
+import { fetchQuestions, fetchQuestionsByIdsOrdered } from './questions';
 import { updateStatsAfterAttempt } from './progress';
 import { recordActivity } from './streaks';
 import { checkAchievements } from './achievements';
+
+function shuffleInPlace<T>(arr: T[]): T[] {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
 
 export async function createAttempt(
   userId: string,
@@ -51,7 +59,6 @@ export async function saveAnswer(
   questionId: string,
   selected: 'A' | 'B' | 'C' | 'D' | null,
   isFlagged = false,
-  /** Prefer client-known correct answer to skip an extra SELECT */
   knownCorrect?: 'A' | 'B' | 'C' | 'D'
 ) {
   let correctAnswer = knownCorrect;
@@ -82,10 +89,6 @@ export async function saveAnswer(
   return { isCorrect };
 }
 
-/**
- * Score + mark attempt complete, then return immediately.
- * Stats / streak / achievements run in the background so Results opens fast.
- */
 export async function completeAttempt(
   attemptId: string,
   userId: string,
@@ -126,7 +129,6 @@ export async function completeAttempt(
   const typedAttempt = attempt as ExamAttempt;
   const isDaily = !!typedAttempt.is_daily_challenge;
 
-  // Background: progress + streak + achievements (do not block Results navigation)
   void (async () => {
     try {
       await updateStatsAfterAttempt(userId, typedAnswers);
@@ -233,6 +235,40 @@ export async function startPractice(userId: string, config: PracticeConfig) {
   const timeLimit = config.mode === 'mock' ? config.count * 90 : undefined;
   const attempt = await createAttempt(userId, config, questions, timeLimit);
   return { attempt, questions };
+}
+
+/**
+ * Start a practice session from exact question IDs (mistakes / focus weak).
+ * Shuffles and caps at maxCount (default 20).
+ */
+export async function startPracticeFromQuestionIds(
+  userId: string,
+  questionIds: string[],
+  maxCount = MISTAKES_SESSION_SIZE
+) {
+  const unique = [...new Set(questionIds.filter(Boolean))];
+  if (unique.length === 0) {
+    throw new Error('No questions to practice.');
+  }
+
+  const shuffled = shuffleInPlace([...unique]);
+  const selectedIds = shuffled.slice(0, Math.min(maxCount, shuffled.length));
+  const questions = await fetchQuestionsByIdsOrdered(selectedIds);
+  const active = questions.filter((q) => q.is_active !== false);
+
+  if (active.length === 0) {
+    throw new Error('Those questions are no longer available.');
+  }
+
+  const finalQs = shuffleInPlace([...active]);
+  const config: PracticeConfig = {
+    category: 'MIXED',
+    count: finalQs.length,
+    difficulty: 'MIXED',
+    mode: 'practice',
+  };
+  const attempt = await createAttempt(userId, config, finalQs);
+  return { attempt, questions: finalQs };
 }
 
 export async function startDailyChallenge(userId: string) {

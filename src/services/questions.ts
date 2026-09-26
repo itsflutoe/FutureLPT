@@ -9,7 +9,6 @@ function shuffleInPlace<T>(arr: T[]): T[] {
   return arr;
 }
 
-/** Fetch all matching question IDs (paginated) so the full bank can be sampled. */
 async function fetchAllMatchingIds(config: {
   category?: PracticeCategory;
   subject?: string;
@@ -30,7 +29,6 @@ async function fetchAllMatchingIds(config: {
     if (config.category && config.category !== 'MIXED') {
       query = query.eq('category', config.category);
     }
-    // MIXED: no category filter → full active bank across categories
     if (config.subject) query = query.eq('subject', config.subject);
     if (config.topic) query = query.eq('topic', config.topic);
     if (config.difficulty && config.difficulty !== 'MIXED') {
@@ -51,7 +49,6 @@ async function fetchAllMatchingIds(config: {
 
 async function fetchQuestionsByIds(ids: string[]): Promise<Question[]> {
   if (ids.length === 0) return [];
-  // Supabase .in() handles batches; chunk if very large
   const chunkSize = 100;
   const out: Question[] = [];
   for (let i = 0; i < ids.length; i += chunkSize) {
@@ -60,17 +57,15 @@ async function fetchQuestionsByIds(ids: string[]): Promise<Question[]> {
     if (error) throw error;
     out.push(...((data || []) as Question[]));
   }
-  // Preserve requested id order
   const map = new Map(out.map((q) => [q.id, q]));
   return ids.map((id) => map.get(id)).filter(Boolean) as Question[];
 }
 
-/**
- * True random sample from the FULL matching active set.
- * When userId is provided, prefers questions the user has not attempted yet
- * so the bank is covered over time, then fills with previously seen items
- * (still randomly ordered).
- */
+/** Public helper for mistakes / focus-weak sessions. */
+export async function fetchQuestionsByIdsOrdered(ids: string[]): Promise<Question[]> {
+  return fetchQuestionsByIds(ids);
+}
+
 export async function fetchQuestions(config: {
   category?: PracticeCategory;
   subject?: string;
@@ -90,7 +85,6 @@ export async function fetchQuestions(config: {
 
   if (ids.length === 0) return [];
 
-  // Prefer unseen questions for this user so the full bank gets used over sessions
   let orderedIds: string[] = [];
   if (config.userId) {
     const { data: stats } = await supabase
@@ -107,7 +101,6 @@ export async function fetchQuestions(config: {
     orderedIds = shuffleInPlace([...ids]);
   }
 
-  // For MIXED difficulty, re-balance after loading details when possible
   const selectedIds = orderedIds.slice(0, Math.min(limit * 4, orderedIds.length));
   let questions = await fetchQuestionsByIds(selectedIds);
 
@@ -119,14 +112,11 @@ export async function fetchQuestions(config: {
     let ei = 0;
     let mi = 0;
     let hi = 0;
-    // Prefer unseen order already applied within each difficulty via selectedIds order —
-    // lists above keep relative order from `questions` which followed orderedIds.
     while (result.length < limit && (ei < easy.length || mi < mod.length || hi < hard.length)) {
       if (mi < mod.length && result.length < limit) result.push(mod[mi++]);
       if (ei < easy.length && result.length < limit) result.push(easy[ei++]);
       if (hi < hard.length && result.length < limit) result.push(hard[hi++]);
     }
-    // If still short, fill from remaining selected questions
     if (result.length < limit) {
       const used = new Set(result.map((q) => q.id));
       for (const q of questions) {
@@ -136,7 +126,6 @@ export async function fetchQuestions(config: {
     }
     questions = shuffleInPlace(result);
   } else {
-    // Keep coverage order (unseen first) but only take `limit`, then shuffle session order
     const byId = new Map(questions.map((q) => [q.id, q]));
     const picked: Question[] = [];
     for (const id of orderedIds) {
@@ -144,7 +133,6 @@ export async function fetchQuestions(config: {
       const q = byId.get(id);
       if (q) picked.push(q);
     }
-    // If we only loaded a subset of details, fetch any missing
     if (picked.length < limit) {
       const need = orderedIds.filter((id) => !byId.has(id)).slice(0, limit - picked.length);
       if (need.length) {
