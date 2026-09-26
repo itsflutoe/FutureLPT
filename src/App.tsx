@@ -19,6 +19,7 @@ import History from '@/pages/History';
 import Bookmarks from '@/pages/Bookmarks';
 import Mistakes from '@/pages/Mistakes';
 import Achievements from '@/pages/Achievements';
+import Announcements from '@/pages/Announcements';
 import Profile from '@/pages/Profile';
 import Settings from '@/pages/Settings';
 import AdminDashboard from '@/pages/admin/AdminDashboard';
@@ -26,6 +27,7 @@ import AdminQuestions from '@/pages/admin/AdminQuestions';
 import AdminImport from '@/pages/admin/AdminImport';
 import AdminUsers from '@/pages/admin/AdminUsers';
 import AdminStats from '@/pages/admin/AdminStats';
+import AdminAnnouncements from '@/pages/admin/AdminAnnouncements';
 
 export default function App() {
   return (
@@ -52,6 +54,7 @@ export default function App() {
               <Route path="/bookmarks" element={<Bookmarks />} />
               <Route path="/mistakes" element={<Mistakes />} />
               <Route path="/achievements" element={<Achievements />} />
+              <Route path="/announcements" element={<Announcements />} />
               <Route path="/profile" element={<Profile />} />
               <Route path="/settings" element={<Settings />} />
             </Route>
@@ -62,6 +65,7 @@ export default function App() {
               <Route path="/admin/import" element={<AdminImport />} />
               <Route path="/admin/users" element={<AdminUsers />} />
               <Route path="/admin/stats" element={<AdminStats />} />
+              <Route path="/admin/announcements" element={<AdminAnnouncements />} />
             </Route>
 
             <Route path="*" element={<Navigate to="/" replace />} />

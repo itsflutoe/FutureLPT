@@ -11,9 +11,11 @@ import {
   Upload,
   Users,
   ChevronRight,
+  Megaphone,
 } from 'lucide-react';
 
 const adminLinks = [
+  { to: '/admin/announcements', label: 'Announcements', desc: 'Tips & updates for students', icon: Megaphone },
   { to: '/admin/stats', label: 'Question Bank Statistics', desc: 'Counts by category & topic', icon: BarChart3 },
   { to: '/admin/questions', label: 'Manage Questions', desc: 'Search, edit, export, delete', icon: BookOpen },
   { to: '/admin/import', label: 'CSV Import', desc: 'Bulk upload questions', icon: Upload },
