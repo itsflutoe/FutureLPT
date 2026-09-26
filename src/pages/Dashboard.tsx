@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { getOverallStats, getRecommendations, getSubjectPerformance } from '@/services/progress';
 import { getUserHistory, hasCompletedDailyChallengeToday } from '@/services/exams';
+import { getLatestAnnouncement, type Announcement } from '@/services/announcements';
 import { getGreeting, formatPercent, formatSessionTitle, formatMode } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -17,6 +18,7 @@ import {
   ArrowRight,
   CheckCircle2,
   Zap,
+  Megaphone,
 } from 'lucide-react';
 import type { ExamAttempt, UserTopicStat } from '@/types';
 import { DAILY_CHALLENGE_COUNT } from '@/types';
@@ -37,24 +39,27 @@ export default function Dashboard() {
   >({});
   const [history, setHistory] = useState<ExamAttempt[]>([]);
   const [dailyDone, setDailyDone] = useState(false);
+  const [latestPost, setLatestPost] = useState<Announcement | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!user) return;
     (async () => {
       try {
-        const [s, r, sub, h, daily] = await Promise.all([
+        const [s, r, sub, h, daily, ann] = await Promise.all([
           getOverallStats(user.id),
           getRecommendations(user.id),
           getSubjectPerformance(user.id),
           getUserHistory(user.id, 3),
           hasCompletedDailyChallengeToday(user.id),
+          getLatestAnnouncement().catch(() => null),
         ]);
         setStats(s);
         setRecs(r.slice(0, 3));
         setSubjects(sub);
         setHistory(h);
         setDailyDone(daily);
+        setLatestPost(ann);
       } catch (e) {
         console.error(e);
       } finally {
@@ -84,7 +89,6 @@ export default function Dashboard() {
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-6 sm:py-8 space-y-6">
-      {/* Greeting + streak — compact */}
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h1 className="text-xl sm:text-2xl font-bold tracking-tight truncate">
@@ -99,7 +103,6 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* PRIMARY ACTIONS — above the fold */}
       <div className="grid gap-3 sm:grid-cols-2">
         <Button
           className="w-full min-h-12 text-base"
@@ -118,7 +121,6 @@ export default function Dashboard() {
         </Button>
       </div>
 
-      {/* Daily challenge — single clear CTA */}
       <Card>
         <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div className="min-w-0">
@@ -143,7 +145,29 @@ export default function Dashboard() {
         </CardContent>
       </Card>
 
-      {/* 3 key stats only — not an analytics wall */}
+      {latestPost && (
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-start gap-3">
+              <Megaphone className="h-4 w-4 text-[var(--accent-color)] shrink-0 mt-0.5" aria-hidden />
+              <div className="min-w-0 flex-1">
+                <div className="text-xs text-[var(--muted-foreground)] mb-0.5">Announcement</div>
+                <div className="font-medium text-sm">{latestPost.title}</div>
+                <p className="text-xs text-[var(--muted-foreground)] mt-1 line-clamp-2">
+                  {latestPost.body}
+                </p>
+                <Link
+                  to="/announcements"
+                  className="text-xs text-[var(--accent-color)] hover:underline mt-2 inline-block"
+                >
+                  View all →
+                </Link>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <div className="grid grid-cols-3 gap-2 sm:gap-3">
         <Card className="min-w-0">
           <CardContent className="p-3 sm:p-4">
@@ -165,7 +189,6 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      {/* Recommendations — max 3 */}
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="flex items-center gap-2 text-base">
@@ -214,7 +237,6 @@ export default function Dashboard() {
         </CardContent>
       </Card>
 
-      {/* Recent — 3 items */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between pb-2">
           <CardTitle className="text-base">Recent</CardTitle>
@@ -267,7 +289,6 @@ export default function Dashboard() {
         </CardContent>
       </Card>
 
-      {/* Subject snapshots — capped; full detail on Progress */}
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
           <CardHeader className="pb-2">

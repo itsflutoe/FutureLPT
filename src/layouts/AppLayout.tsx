@@ -15,6 +15,7 @@ import {
   Menu,
   X,
   Home,
+  Megaphone,
 } from 'lucide-react';
 import { useState } from 'react';
 import { signOut } from '@/services/auth';
@@ -28,6 +29,7 @@ const primaryNav = [
 ];
 
 const reviewNav = [
+  { to: '/announcements', label: 'Announcements', icon: Megaphone },
   { to: '/topics', label: 'Topics', icon: FolderOpen },
   { to: '/history', label: 'History', icon: History },
   { to: '/bookmarks', label: 'Bookmarks', icon: Bookmark },
