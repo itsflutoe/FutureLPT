@@ -9,9 +9,13 @@ export const COMPANION_ENERGY = {
   COST: 1,
 } as const;
 
-/** Same model FET uses — gemini-2.0-flash is retired. */
+/**
+ * Prefer FET’s flash-lite; fall back if that model is overloaded / unavailable.
+ * Order: capacity-friendly → GA flash → newest flash.
+ */
 export const GEMINI_CONFIG = {
   MODEL: 'gemini-3.5-flash-lite',
+  FALLBACK_MODELS: ['gemini-3.5-flash', 'gemini-3.8-flash', 'gemini-2.5-flash-lite'] as const,
   MAX_OUTPUT_TOKENS: 1024,
   TEMPERATURE: 0.7,
 } as const;
