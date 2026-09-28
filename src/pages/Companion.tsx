@@ -6,6 +6,8 @@ import {
   SPECIES,
   PERSONALITIES,
   COMPANION_ENERGY,
+  type SpeciesId,
+  type PersonalityId,
 } from '@/features/companion/config';
 import { PetAvatar } from '@/features/companion/components/PetAvatar';
 import { getMistakes, getTopicStats } from '@/services/progress';
@@ -25,13 +27,15 @@ export default function CompanionPage() {
     sendMessage,
     loading,
     setApiKey,
+    updateProfile,
     setHidden,
   } = useCompanion();
   const [params] = useSearchParams();
   const modeParam = (params.get('mode') as 'chat' | 'teach' | 'review') || 'chat';
-  const [mode, setMode] = useState<'chat' | 'teach' | 'review'>(modeParam);
+  const [mode, setMode] = useState<'chat' | 'teach' | 'review' | 'settings'>(modeParam);
   const [input, setInput] = useState('');
   const [apiKeyDraft, setApiKeyDraft] = useState('');
+  const [nameDraft, setNameDraft] = useState('');
   const [topics, setTopics] = useState<{ subject: string; topic: string; category: string }[]>([]);
   const [selectedTopic, setSelectedTopic] = useState('');
   const [freeTopic, setFreeTopic] = useState('');
@@ -48,12 +52,18 @@ export default function CompanionPage() {
       correct_count?: number;
     }[]
   >([]);
+  const [keySaved, setKeySaved] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesBoxRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    setMode(modeParam);
+    if (modeParam === 'settings') setMode('settings');
+    else setMode(modeParam);
   }, [modeParam]);
+
+  useEffect(() => {
+    if (profile?.name) setNameDraft(profile.name);
+  }, [profile?.name]);
 
   useEffect(() => {
     if (!user) return;
@@ -69,7 +79,6 @@ export default function CompanionPage() {
     void getMistakes(user.id, 20).then(setMistakes);
   }, [user]);
 
-  // FET-style: scroll only the messages list, not the whole page
   useEffect(() => {
     const end = messagesEndRef.current;
     if (!end) return;
@@ -107,6 +116,7 @@ export default function CompanionPage() {
   const personality = PERSONALITIES[profile.personality || 'friendly'];
   const mood = loading ? 'thinking' : profile.mood || 'happy';
   const energyLow = profile.energy <= 0;
+  const hasKey = !!profile.gemini_api_key?.trim();
 
   const onSend = async () => {
     const text = input.trim();
@@ -129,10 +139,17 @@ export default function CompanionPage() {
       };
     }
     try {
-      await sendMessage(text, mode, study);
+      await sendMessage(text, mode === 'settings' ? 'chat' : mode, study);
     } catch {
       /* pet line already in messages */
     }
+  };
+
+  const saveKey = async () => {
+    await setApiKey(apiKeyDraft);
+    setApiKeyDraft('');
+    setKeySaved(true);
+    setTimeout(() => setKeySaved(false), 2000);
   };
 
   const heading =
@@ -140,12 +157,21 @@ export default function CompanionPage() {
       ? `Teach with ${profile.name}`
       : mode === 'review'
         ? `Review with ${profile.name}`
-        : `Talk to ${profile.name}`;
+        : mode === 'settings'
+          ? 'Companion settings'
+          : `Talk to ${profile.name}`;
 
   return (
     <div className="mx-auto max-w-lg w-full px-3 sm:px-4 flex flex-col h-[calc(100dvh-4.5rem)] max-h-[calc(100dvh-4.5rem)] overflow-hidden">
-      {/* Compact hero — stays fixed, does not scroll with chat */}
-      <section className="shrink-0 flex flex-col items-center text-center pt-3 pb-2">
+      <section className="shrink-0 flex flex-col items-center text-center pt-3 pb-2 relative">
+        <button
+          type="button"
+          onClick={() => setMode(mode === 'settings' ? 'chat' : 'settings')}
+          className="absolute right-0 top-3 text-xs font-semibold text-[var(--accent-color)] min-h-9 px-2 rounded-lg hover:bg-[var(--muted)]/50"
+          aria-label="Settings"
+        >
+          {mode === 'settings' ? 'Done' : 'Settings'}
+        </button>
         <PetAvatar
           species={profile.species}
           mood={energyLow ? 'sleepy' : mood}
@@ -154,6 +180,11 @@ export default function CompanionPage() {
         <h1 className="font-bold text-lg mt-1.5 tracking-tight">{profile.name}</h1>
         <p className="text-[11px] text-[var(--muted-foreground)]">
           {personality?.name} · {species.name}
+          {hasKey ? (
+            <span className="ml-1.5 text-emerald-600">· connected</span>
+          ) : (
+            <span className="ml-1.5 text-amber-600">· needs key</span>
+          )}
         </p>
         <div className="mt-1.5 inline-flex items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--muted)]/40 px-2.5 py-0.5 text-[11px] font-medium">
           <span>⚡</span>
@@ -179,163 +210,277 @@ export default function CompanionPage() {
         </Link>
       </section>
 
-      {!profile.gemini_api_key && (
-        <div className="shrink-0 mb-2 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 space-y-2">
-          <p className="text-sm font-medium">Your companion is hungry</p>
-          <p className="text-xs text-[var(--muted-foreground)]">
-            Add a free Gemini key so {profile.name} can reply.
-          </p>
-          <a
-            className="text-xs font-medium text-[var(--accent-color)] hover:underline"
-            href="https://aistudio.google.com/app/apikey"
-            target="_blank"
-            rel="noreferrer"
-          >
-            Find my Gemini key ↗
-          </a>
-          <Input
-            type="password"
-            value={apiKeyDraft}
-            onChange={(e) => setApiKeyDraft(e.target.value)}
-            placeholder="Paste Gemini API key"
-            autoComplete="off"
-          />
-          <Button size="sm" onClick={() => void setApiKey(apiKeyDraft)} disabled={!apiKeyDraft.trim()}>
-            Feed companion
-          </Button>
-        </div>
-      )}
-
-      <div className="shrink-0 flex gap-1.5 mb-2">
-        {(['chat', 'teach', 'review'] as const).map((m) => (
-          <button
-            key={m}
-            type="button"
-            onClick={() => setMode(m)}
-            className={`flex-1 rounded-xl border py-2 text-xs font-semibold capitalize min-h-10 transition-colors ${
-              mode === m
-                ? 'border-[var(--accent-color)] bg-[var(--accent-color)] text-white'
-                : 'border-[var(--border)] text-[var(--muted-foreground)]'
-            }`}
-          >
-            {m === 'teach' ? 'Teach Me' : m}
-          </button>
-        ))}
-      </div>
-
-      {mode === 'teach' && (
-        <div className="shrink-0 mb-2 space-y-1.5">
-          <select
-            className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm min-h-10"
-            value={selectedTopic}
-            onChange={(e) => setSelectedTopic(e.target.value)}
-          >
-            <option value="">Pick a FLPT topic…</option>
-            {topics.map((t) => (
-              <option key={`${t.subject}-${t.topic}`} value={t.topic}>
-                {t.subject} — {t.topic}
-              </option>
-            ))}
-          </select>
-          <Input
-            placeholder="Or type any topic…"
-            value={freeTopic}
-            onChange={(e) => setFreeTopic(e.target.value)}
-          />
-        </div>
-      )}
-
-      {mode === 'review' && (
-        <p className="shrink-0 text-[11px] text-[var(--muted-foreground)] mb-1.5">
-          Uses your recent FutureLPT mistakes ({mistakes.length} loaded).
-        </p>
-      )}
-
-      {/* Chat panel — only this region scrolls (FET pattern) */}
-      <section className="flex-1 min-h-0 flex flex-col rounded-xl border border-[var(--border)] bg-[var(--card)] overflow-hidden shadow-sm">
-        <div className="shrink-0 px-3 py-2 border-b border-[var(--border)]">
-          <p className="text-xs font-semibold text-[var(--muted-foreground)]">{heading}</p>
-        </div>
-
-        <div
-          ref={messagesBoxRef}
-          className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-3 py-3 space-y-3"
-          style={{ WebkitOverflowScrolling: 'touch' }}
-        >
-          {messages.length === 0 && (
-            <p className="text-sm text-[var(--muted-foreground)] text-center py-8">
-              Say hello — or ask about a tough LET topic.
+      {mode === 'settings' ? (
+        <section className="flex-1 min-h-0 overflow-y-auto overscroll-contain space-y-4 pb-4">
+          <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-4 space-y-3">
+            <h2 className="text-sm font-bold">Gemini key</h2>
+            <p className="text-xs text-[var(--muted-foreground)]">
+              Stored on your FutureLPT account only. Same free key you use in AI Studio / FET.
             </p>
-          )}
-          {messages.map((m) => (
-            <div
-              key={m.id}
-              className={`flex gap-2 ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}
+            <p
+              className={`text-xs font-medium ${hasKey ? 'text-emerald-600' : 'text-amber-600'}`}
             >
-              {m.role === 'companion' && (
-                <div className="shrink-0 mt-0.5">
-                  <PetAvatar species={profile.species} mood="happy" size="sm" showBubble={false} />
-                </div>
+              {hasKey ? 'Connected' : 'Not connected'}
+            </p>
+            <Input
+              type="password"
+              value={apiKeyDraft}
+              onChange={(e) => setApiKeyDraft(e.target.value)}
+              placeholder={hasKey ? 'Paste new key to replace…' : 'Paste Gemini API key'}
+              autoComplete="off"
+            />
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" onClick={() => void saveKey()} disabled={!apiKeyDraft.trim()}>
+                {hasKey ? 'Update key' : 'Save key'}
+              </Button>
+              {hasKey && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => void setApiKey('')}
+                >
+                  Disconnect
+                </Button>
               )}
-              <div
-                className={`rounded-2xl px-3.5 py-2.5 text-sm max-w-[82%] leading-relaxed whitespace-pre-wrap break-words ${
-                  m.role === 'user'
-                    ? 'bg-[var(--accent-color)] text-white rounded-br-md'
-                    : 'bg-[var(--muted)]/50 border border-[var(--border)] rounded-bl-md'
+              <a
+                className="inline-flex items-center text-xs font-medium text-[var(--accent-color)] hover:underline px-1"
+                href="https://aistudio.google.com/app/apikey"
+                target="_blank"
+                rel="noreferrer"
+              >
+                Get free key ↗
+              </a>
+            </div>
+            {keySaved && <p className="text-xs text-emerald-600">Key saved.</p>}
+          </div>
+
+          <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-4 space-y-3">
+            <h2 className="text-sm font-bold">Identity</h2>
+            <label className="block space-y-1">
+              <span className="text-xs font-medium text-[var(--muted-foreground)]">Name</span>
+              <Input
+                value={nameDraft}
+                onChange={(e) => setNameDraft(e.target.value)}
+                maxLength={24}
+              />
+            </label>
+            <Button
+              size="sm"
+              onClick={() => void updateProfile({ name: nameDraft.trim() || profile.name })}
+              disabled={!nameDraft.trim() || nameDraft.trim() === profile.name}
+            >
+              Save name
+            </Button>
+            <label className="block space-y-1">
+              <span className="text-xs font-medium text-[var(--muted-foreground)]">Species</span>
+              <select
+                className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2.5 text-sm min-h-11"
+                value={profile.species || 'fox'}
+                onChange={(e) =>
+                  void updateProfile({ species: e.target.value as SpeciesId })
+                }
+              >
+                {Object.values(SPECIES).map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.emoji} {s.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="block space-y-1">
+              <span className="text-xs font-medium text-[var(--muted-foreground)]">Personality</span>
+              <select
+                className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2.5 text-sm min-h-11"
+                value={profile.personality || 'friendly'}
+                onChange={(e) =>
+                  void updateProfile({ personality: e.target.value as PersonalityId })
+                }
+              >
+                {Object.values(PERSONALITIES).map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-4 space-y-2">
+            <h2 className="text-sm font-bold">Dashboard pet</h2>
+            <button
+              type="button"
+              className="text-sm text-[var(--accent-color)] font-medium"
+              onClick={() => void setHidden(!profile.hidden_on_dashboard)}
+            >
+              {profile.hidden_on_dashboard
+                ? 'Show pet on Dashboard'
+                : 'Hide pet on Dashboard'}
+            </button>
+          </div>
+
+          <Button className="w-full" onClick={() => setMode('chat')}>
+            Back to chat
+          </Button>
+        </section>
+      ) : (
+        <>
+          {!hasKey && (
+            <div className="shrink-0 mb-2 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 space-y-2">
+              <p className="text-sm font-medium">Your companion is hungry</p>
+              <p className="text-xs text-[var(--muted-foreground)]">
+                Add a free Gemini key so {profile.name} can reply — or open{' '}
+                <button
+                  type="button"
+                  className="font-semibold text-[var(--accent-color)] underline"
+                  onClick={() => setMode('settings')}
+                >
+                  Settings
+                </button>
+                .
+              </p>
+              <Input
+                type="password"
+                value={apiKeyDraft}
+                onChange={(e) => setApiKeyDraft(e.target.value)}
+                placeholder="Paste Gemini API key"
+                autoComplete="off"
+              />
+              <Button size="sm" onClick={() => void saveKey()} disabled={!apiKeyDraft.trim()}>
+                Feed companion
+              </Button>
+            </div>
+          )}
+
+          <div className="shrink-0 flex gap-1.5 mb-2">
+            {(['chat', 'teach', 'review'] as const).map((m) => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => setMode(m)}
+                className={`flex-1 rounded-xl border py-2 text-xs font-semibold capitalize min-h-10 transition-colors ${
+                  mode === m
+                    ? 'border-[var(--accent-color)] bg-[var(--accent-color)] text-white'
+                    : 'border-[var(--border)] text-[var(--muted-foreground)]'
                 }`}
               >
-                {m.content}
-              </div>
-            </div>
-          ))}
-          {loading && (
-            <div className="flex gap-2 items-end">
-              <PetAvatar species={profile.species} mood="thinking" size="sm" />
-              <div className="rounded-2xl rounded-bl-md border border-[var(--border)] bg-[var(--muted)]/50 px-3.5 py-2.5 text-sm italic text-[var(--muted-foreground)]">
-                thinking…
-              </div>
+                {m === 'teach' ? 'Teach Me' : m}
+              </button>
+            ))}
+          </div>
+
+          {mode === 'teach' && (
+            <div className="shrink-0 mb-2 space-y-1.5">
+              <select
+                className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm min-h-10"
+                value={selectedTopic}
+                onChange={(e) => setSelectedTopic(e.target.value)}
+              >
+                <option value="">Pick a FLPT topic…</option>
+                {topics.map((t) => (
+                  <option key={`${t.subject}-${t.topic}`} value={t.topic}>
+                    {t.subject} — {t.topic}
+                  </option>
+                ))}
+              </select>
+              <Input
+                placeholder="Or type any topic…"
+                value={freeTopic}
+                onChange={(e) => setFreeTopic(e.target.value)}
+              />
             </div>
           )}
-          <div ref={messagesEndRef} />
-        </div>
 
-        <form
-          className="shrink-0 flex gap-2 p-2.5 border-t border-[var(--border)] bg-[var(--card)]"
-          style={{ paddingBottom: 'max(0.625rem, env(safe-area-inset-bottom))' }}
-          onSubmit={(e) => {
-            e.preventDefault();
-            void onSend();
-          }}
-        >
-          <Input
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder={
-              energyLow
-                ? `${profile.name} is resting…`
-                : mode === 'chat'
-                  ? `Message ${profile.name}…`
-                  : mode === 'teach'
-                    ? 'What should we learn?'
-                    : 'What went wrong?'
-            }
-            disabled={loading || energyLow}
-            className="min-h-11"
-          />
-          <Button type="submit" disabled={loading || energyLow || !input.trim()} className="min-h-11 px-4">
-            Send
-          </Button>
-        </form>
-      </section>
+          {mode === 'review' && (
+            <p className="shrink-0 text-[11px] text-[var(--muted-foreground)] mb-1.5">
+              Uses your recent FutureLPT mistakes ({mistakes.length} loaded).
+            </p>
+          )}
 
-      {profile.hidden_on_dashboard && (
-        <button
-          type="button"
-          className="shrink-0 mt-2 mb-1 text-xs text-[var(--accent-color)] text-center"
-          onClick={() => void setHidden(false)}
-        >
-          Show pet on Dashboard again
-        </button>
+          <section className="flex-1 min-h-0 flex flex-col rounded-xl border border-[var(--border)] bg-[var(--card)] overflow-hidden shadow-sm">
+            <div className="shrink-0 px-3 py-2 border-b border-[var(--border)]">
+              <p className="text-xs font-semibold text-[var(--muted-foreground)]">{heading}</p>
+            </div>
+
+            <div
+              ref={messagesBoxRef}
+              className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-3 py-3 space-y-3"
+              style={{ WebkitOverflowScrolling: 'touch' }}
+            >
+              {messages.length === 0 && (
+                <p className="text-sm text-[var(--muted-foreground)] text-center py-8">
+                  Say hello — or ask about a tough LET topic.
+                </p>
+              )}
+              {messages.map((m) => (
+                <div
+                  key={m.id}
+                  className={`flex gap-2 ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                >
+                  {m.role === 'companion' && (
+                    <div className="shrink-0 mt-0.5">
+                      <PetAvatar
+                        species={profile.species}
+                        mood="happy"
+                        size="sm"
+                        showBubble={false}
+                      />
+                    </div>
+                  )}
+                  <div
+                    className={`rounded-2xl px-3.5 py-2.5 text-sm max-w-[82%] leading-relaxed whitespace-pre-wrap break-words ${
+                      m.role === 'user'
+                        ? 'bg-[var(--accent-color)] text-white rounded-br-md'
+                        : 'bg-[var(--muted)]/50 border border-[var(--border)] rounded-bl-md'
+                    }`}
+                  >
+                    {m.content}
+                  </div>
+                </div>
+              ))}
+              {loading && (
+                <div className="flex gap-2 items-end">
+                  <PetAvatar species={profile.species} mood="thinking" size="sm" />
+                  <div className="rounded-2xl rounded-bl-md border border-[var(--border)] bg-[var(--muted)]/50 px-3.5 py-2.5 text-sm italic text-[var(--muted-foreground)]">
+                    thinking…
+                  </div>
+                </div>
+              )}
+              <div ref={messagesEndRef} />
+            </div>
+
+            <form
+              className="shrink-0 flex gap-2 p-2.5 border-t border-[var(--border)] bg-[var(--card)]"
+              style={{ paddingBottom: 'max(0.625rem, env(safe-area-inset-bottom))' }}
+              onSubmit={(e) => {
+                e.preventDefault();
+                void onSend();
+              }}
+            >
+              <Input
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                placeholder={
+                  energyLow
+                    ? `${profile.name} is resting…`
+                    : mode === 'chat'
+                      ? `Message ${profile.name}…`
+                      : mode === 'teach'
+                        ? 'What should we learn?'
+                        : 'What went wrong?'
+                }
+                disabled={loading || energyLow}
+                className="min-h-11"
+              />
+              <Button
+                type="submit"
+                disabled={loading || energyLow || !input.trim()}
+                className="min-h-11 px-4"
+              >
+                Send
+              </Button>
+            </form>
+          </section>
+        </>
       )}
     </div>
   );
