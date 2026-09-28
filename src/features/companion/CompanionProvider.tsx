@@ -20,7 +20,7 @@ import {
   spendEnergy,
   pushMemory,
 } from './api';
-import { generateCompanionReply } from './gemini';
+import { generateCompanionReply, petErrorMessage } from './gemini';
 import { calculateEnergy } from './energy';
 
 interface CompanionContextValue {
@@ -45,7 +45,6 @@ interface CompanionContextValue {
     contextType: 'chat' | 'teach' | 'review',
     studyContext?: StudyContext | null
   ) => Promise<string>;
-  /** Session-only: last practice miss for discovery UI */
   lastMissContext: StudyContext | null;
   setLastMissContext: (c: StudyContext | null) => void;
   discoveryOpen: boolean;
@@ -53,6 +52,18 @@ interface CompanionContextValue {
 }
 
 const CompanionContext = createContext<CompanionContextValue | null>(null);
+
+function errorToPetLine(e: unknown, name: string): string {
+  if (typeof e === 'object' && e && 'type' in e) {
+    const t = String((e as { type: string }).type);
+    if (t) return petErrorMessage(t, name);
+  }
+  if (typeof e === 'object' && e && 'message' in e) {
+    return String((e as { message: string }).message);
+  }
+  if (e instanceof Error) return e.message;
+  return petErrorMessage('UNKNOWN', name);
+}
 
 export function CompanionProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
@@ -81,7 +92,7 @@ export function CompanionProvider({ children }: { children: ReactNode }) {
       }
     } catch (e) {
       console.error(e);
-      setError(e instanceof Error ? e.message : 'Companion failed to load');
+      setError(petErrorMessage('UNKNOWN', 'Your companion'));
     } finally {
       setReady(true);
     }
@@ -91,7 +102,6 @@ export function CompanionProvider({ children }: { children: ReactNode }) {
     void refresh();
   }, [refresh]);
 
-  // Energy tick display
   useEffect(() => {
     if (!profile?.unlocked) return;
     const id = setInterval(() => {
@@ -155,18 +165,19 @@ export function CompanionProvider({ children }: { children: ReactNode }) {
       studyContext?: StudyContext | null
     ) => {
       if (!user || !profile) throw new Error('No companion');
+      const petName = profile.name || 'Your companion';
       setError(null);
       setLoading(true);
       try {
         const key = profile.gemini_api_key?.trim();
         if (!key) {
-          throw { type: 'MISSING_KEY', message: 'Add your Gemini API key to chat with your companion.' };
+          throw { type: 'MISSING_KEY', message: petErrorMessage('MISSING_KEY', petName) };
         }
         const spent = await spendEnergy(user.id, profile, COMPANION_ENERGY.COST);
         if (!spent.ok) {
           await updateCompanionProfile(user.id, { mood: 'low_energy' });
           setProfile((p) => (p ? { ...p, mood: 'low_energy', energy: spent.energy } : p));
-          throw { type: 'NO_ENERGY', message: 'Companion energy is low. Wait a few minutes.' };
+          throw { type: 'NO_ENERGY', message: petErrorMessage('NO_ENERGY', petName) };
         }
         setProfile((p) => (p ? { ...p, energy: spent.energy, mood: 'thinking' } : p));
 
@@ -186,29 +197,33 @@ export function CompanionProvider({ children }: { children: ReactNode }) {
           memLine = `Reviewed: ${studyContext.topic}`;
         else if (contextType === 'teach' && studyContext?.topic)
           memLine = `Taught: ${studyContext.topic}`;
-        else if (text)
-          memLine = `Chat: ${text.slice(0, 60)}`;
+        else if (text) memLine = `Chat: ${text.slice(0, 60)}`;
 
         let memories = profile.memories;
         if (memLine) memories = await pushMemory(user.id, profile.memories, memLine);
 
         await updateCompanionProfile(user.id, { mood: 'happy', memories });
-        setProfile((p) =>
-          p ? { ...p, energy: spent.energy, mood: 'happy', memories } : p
-        );
+        setProfile((p) => (p ? { ...p, energy: spent.energy, mood: 'happy', memories } : p));
         const msgs = await fetchRecentMessages(user.id);
         setMessages(msgs);
         return reply;
       } catch (e: unknown) {
-        const msg =
-          typeof e === 'object' && e && 'message' in e
-            ? String((e as { message: string }).message)
-            : e instanceof Error
-              ? e.message
-              : 'Request failed';
-        setError(msg);
-        void updateCompanionProfile(user.id, { mood: 'error' }).catch(() => {});
-        setProfile((p) => (p ? { ...p, mood: 'error' } : p));
+        const line = errorToPetLine(e, petName);
+        setError(line);
+        // Show failure as a pet chat bubble (in character)
+        try {
+          await insertMessage(user.id, 'companion', line, contextType);
+          const msgs = await fetchRecentMessages(user.id);
+          setMessages(msgs);
+        } catch {
+          /* ignore */
+        }
+        const mood =
+          typeof e === 'object' && e && 'type' in e && (e as { type: string }).type === 'NO_ENERGY'
+            ? 'low_energy'
+            : 'mad';
+        void updateCompanionProfile(user.id, { mood }).catch(() => {});
+        setProfile((p) => (p ? { ...p, mood } : p));
         throw e;
       } finally {
         setLoading(false);
