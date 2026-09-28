@@ -1,29 +1,49 @@
 import { GEMINI_CONFIG, SPECIES, PERSONALITIES } from './config';
 import type { CompanionProfile, StudyContext } from './types';
 
-function classifyError(msg: string): { type: string; message: string } {
+/** User-facing lines — always in the pet’s voice, never “Gemini/API”. */
+export function petErrorMessage(
+  type: string,
+  name = 'Your companion'
+): string {
+  switch (type) {
+    case 'HIGH_DEMAND':
+    case 'RATE_LIMIT':
+      return `${name} is a little overwhelmed right now… try again in a moment. 💤`;
+    case 'MODEL':
+      return `${name} couldn’t quite catch that thought. Give it another try?`;
+    case 'INVALID_KEY':
+    case 'PERMISSION':
+    case 'MISSING_KEY':
+      return `${name} can’t think without food. Check the Gemini key in settings. 🍽`;
+    case 'NO_ENERGY':
+      return `${name} is too sleepy to study right now. 💤`;
+    case 'NETWORK':
+      return `${name} lost the thread for a second. Check your connection and try again.`;
+    case 'EMPTY':
+      return `${name} went quiet… ask again?`;
+    default:
+      return `${name} isn’t in the mood to answer right now. Try again in a bit.`;
+  }
+}
+
+function classifyError(msg: string, name?: string): { type: string; message: string } {
+  const n = name || 'Your companion';
   if (/high demand|experiencing high|temporarily|try again later|overloaded|capacity/i.test(msg))
-    return {
-      type: 'HIGH_DEMAND',
-      message: 'Gemini is busy right now. Wait a few seconds and try again.',
-    };
+    return { type: 'HIGH_DEMAND', message: petErrorMessage('HIGH_DEMAND', n) };
   if (/no longer available|not found|is not supported|NOT_FOUND/i.test(msg))
-    return {
-      type: 'MODEL',
-      message: 'That Gemini model is unavailable. Trying another…',
-    };
+    return { type: 'MODEL', message: petErrorMessage('MODEL', n) };
   if (/api.?key|API_KEY|401|UNAUTHENTICATED|API_KEY_INVALID/i.test(msg))
-    return {
-      type: 'INVALID_KEY',
-      message: 'Gemini API key looks invalid. Update it in Companion settings.',
-    };
+    return { type: 'INVALID_KEY', message: petErrorMessage('INVALID_KEY', n) };
   if (/RESOURCE_EXHAUSTED|quota|rate.?limit|429/i.test(msg))
-    return { type: 'RATE_LIMIT', message: 'Gemini rate limit or quota hit. Try again in a bit.' };
+    return { type: 'RATE_LIMIT', message: petErrorMessage('RATE_LIMIT', n) };
   if (/403|permission|forbidden/i.test(msg))
-    return { type: 'PERMISSION', message: 'Gemini permission error. Check your API key access.' };
+    return { type: 'PERMISSION', message: petErrorMessage('PERMISSION', n) };
   if (/network|fetch|Failed to fetch/i.test(msg))
-    return { type: 'NETWORK', message: 'Network error talking to Gemini.' };
-  return { type: 'UNKNOWN', message: msg || 'Something went wrong with Gemini.' };
+    return { type: 'NETWORK', message: petErrorMessage('NETWORK', n) };
+  if (/empty/i.test(msg))
+    return { type: 'EMPTY', message: petErrorMessage('EMPTY', n) };
+  return { type: 'UNKNOWN', message: petErrorMessage('UNKNOWN', n) };
 }
 
 function isRetryableModelError(msg: string): boolean {
@@ -124,8 +144,10 @@ export async function generateCompanionReply(opts: {
   recentMessages?: { role: string; content: string }[];
 }): Promise<string> {
   const { profile, apiKey, userPrompt, contextType, studyContext, recentMessages } = opts;
+  const petName = profile.name || 'Your companion';
   const system = buildSystemPrompt(profile, contextType, studyContext, recentMessages);
 
+  // Primary: free-tier lite; fallbacks only if overloaded / unavailable
   const models = [GEMINI_CONFIG.MODEL, ...GEMINI_CONFIG.FALLBACK_MODELS];
   let lastMsg = '';
 
@@ -134,15 +156,13 @@ export async function generateCompanionReply(opts: {
     if (result.ok) return result.text;
 
     lastMsg = result.message;
-    // Hard key errors: don't burn through every model
     if (/api.?key|API_KEY|401|UNAUTHENTICATED|API_KEY_INVALID|403|permission|forbidden/i.test(lastMsg)) {
-      throw classifyError(lastMsg);
+      throw classifyError(lastMsg, petName);
     }
     if (!isRetryableModelError(lastMsg)) {
-      throw classifyError(lastMsg);
+      throw classifyError(lastMsg, petName);
     }
-    // else try next model
   }
 
-  throw classifyError(lastMsg || 'All Gemini models failed.');
+  throw classifyError(lastMsg || 'failed', petName);
 }
