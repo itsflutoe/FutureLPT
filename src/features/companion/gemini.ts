@@ -2,10 +2,15 @@ import { GEMINI_CONFIG, SPECIES, PERSONALITIES } from './config';
 import type { CompanionProfile, StudyContext } from './types';
 
 function classifyError(msg: string): { type: string; message: string } {
-  if (/no longer available|not found|is not supported/i.test(msg))
+  if (/high demand|experiencing high|temporarily|try again later|overloaded|capacity/i.test(msg))
+    return {
+      type: 'HIGH_DEMAND',
+      message: 'Gemini is busy right now. Wait a few seconds and try again.',
+    };
+  if (/no longer available|not found|is not supported|NOT_FOUND/i.test(msg))
     return {
       type: 'MODEL',
-      message: 'Gemini model unavailable. Try again after an update, or check your key access.',
+      message: 'That Gemini model is unavailable. Trying another…',
     };
   if (/api.?key|API_KEY|401|UNAUTHENTICATED|API_KEY_INVALID/i.test(msg))
     return {
@@ -21,15 +26,18 @@ function classifyError(msg: string): { type: string; message: string } {
   return { type: 'UNKNOWN', message: msg || 'Something went wrong with Gemini.' };
 }
 
-export async function generateCompanionReply(opts: {
-  profile: CompanionProfile;
-  apiKey: string;
-  userPrompt: string;
-  contextType: 'chat' | 'teach' | 'review';
-  studyContext?: StudyContext | null;
-  recentMessages?: { role: string; content: string }[];
-}): Promise<string> {
-  const { profile, apiKey, userPrompt, contextType, studyContext, recentMessages } = opts;
+function isRetryableModelError(msg: string): boolean {
+  return /high demand|experiencing high|try again later|overloaded|capacity|no longer available|not found|is not supported|NOT_FOUND|RESOURCE_EXHAUSTED|429|unavailable/i.test(
+    msg
+  );
+}
+
+function buildSystemPrompt(
+  profile: CompanionProfile,
+  contextType: 'chat' | 'teach' | 'review',
+  studyContext?: StudyContext | null,
+  recentMessages?: { role: string; content: string }[]
+): string {
   const species = SPECIES[profile.species || 'fox'] || SPECIES.fox;
   const personality = PERSONALITIES[profile.personality || 'friendly'] || PERSONALITIES.friendly;
   const memories = (profile.memories || []).slice(-6);
@@ -40,8 +48,7 @@ export async function generateCompanionReply(opts: {
       ? 'Mode tip: Keep it focused—short explanation, 1 example or tip, 1 supportive closer. Still sound like a friend, not a textbook.'
       : 'Mode tip: Chat mode—3 to 6 short sentences max unless the user asks for detail.';
 
-  // Ultra-lean system prompt (aligned with FET)
-  const system = `You are ${name}, a ${species.name} (${species.emoji}).
+  return `You are ${name}, a ${species.name} (${species.emoji}).
 Personality: ${personality.name} — ${personality.prompt}
 Species voice: ${species.voice}
 
@@ -67,8 +74,15 @@ Interaction mode: ${contextType}.${
           .join('\n')}`
       : ''
   }`;
+}
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_CONFIG.MODEL}:generateContent?key=${encodeURIComponent(apiKey)}`;
+async function callModel(
+  model: string,
+  apiKey: string,
+  system: string,
+  userPrompt: string
+): Promise<{ ok: true; text: string } | { ok: false; message: string }> {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
 
   let res: Response;
   try {
@@ -85,18 +99,50 @@ Interaction mode: ${contextType}.${
       }),
     });
   } catch (e) {
-    throw classifyError(e instanceof Error ? e.message : 'network');
+    return { ok: false, message: e instanceof Error ? e.message : 'network' };
   }
 
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     const msg = data?.error?.message || JSON.stringify(data) || res.statusText;
-    throw classifyError(msg);
+    return { ok: false, message: String(msg) };
   }
 
   const text =
     data?.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p.text || '').join('') ||
     '';
-  if (!text.trim()) throw { type: 'EMPTY', message: 'Empty reply from Gemini.' };
-  return text.trim();
+  if (!text.trim()) return { ok: false, message: 'Empty reply from Gemini.' };
+  return { ok: true, text: text.trim() };
+}
+
+export async function generateCompanionReply(opts: {
+  profile: CompanionProfile;
+  apiKey: string;
+  userPrompt: string;
+  contextType: 'chat' | 'teach' | 'review';
+  studyContext?: StudyContext | null;
+  recentMessages?: { role: string; content: string }[];
+}): Promise<string> {
+  const { profile, apiKey, userPrompt, contextType, studyContext, recentMessages } = opts;
+  const system = buildSystemPrompt(profile, contextType, studyContext, recentMessages);
+
+  const models = [GEMINI_CONFIG.MODEL, ...GEMINI_CONFIG.FALLBACK_MODELS];
+  let lastMsg = '';
+
+  for (const model of models) {
+    const result = await callModel(model, apiKey, system, userPrompt);
+    if (result.ok) return result.text;
+
+    lastMsg = result.message;
+    // Hard key errors: don't burn through every model
+    if (/api.?key|API_KEY|401|UNAUTHENTICATED|API_KEY_INVALID|403|permission|forbidden/i.test(lastMsg)) {
+      throw classifyError(lastMsg);
+    }
+    if (!isRetryableModelError(lastMsg)) {
+      throw classifyError(lastMsg);
+    }
+    // else try next model
+  }
+
+  throw classifyError(lastMsg || 'All Gemini models failed.');
 }
