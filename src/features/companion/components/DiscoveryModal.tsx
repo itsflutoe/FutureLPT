@@ -7,6 +7,28 @@ import { Input } from '@/components/ui/Input';
 
 type Step = 'intro' | 'hungry' | 'feed' | 'setup';
 
+/** Hidden mystery — no pet until after feed + identity. */
+function MysteryBush({ size = 'hero' }: { size?: 'lg' | 'hero' }) {
+  const dim = size === 'hero' ? 'text-6xl sm:text-7xl' : 'text-5xl';
+  return (
+    <div
+      className={`relative inline-flex items-center justify-center select-none ${dim}`}
+      role="img"
+      aria-label="Something hidden in the bushes"
+    >
+      <span className="drop-shadow-md" aria-hidden>
+        🌿
+      </span>
+      <span
+        className="absolute -bottom-1 text-2xl opacity-80 animate-pulse"
+        aria-hidden
+      >
+        ✨
+      </span>
+    </div>
+  );
+}
+
 export function DiscoveryModal() {
   const { enabled, discoveryOpen, setDiscoveryOpen, unlockPet, setApiKey, lastMissContext } =
     useCompanion();
@@ -75,20 +97,22 @@ export function DiscoveryModal() {
         {step === 'intro' && (
           <div className="space-y-4 text-center">
             <p className="text-xs text-[var(--muted-foreground)]">Something was hiding in FutureLPT…</p>
-            <div className="flex justify-center">
-              <PetAvatar species="fox" mood="curious" size="hero" />
+            <div className="flex justify-center py-2">
+              <MysteryBush />
             </div>
             <div className="space-y-2 text-sm">
-              <p className="font-medium">Hi.</p>
+              <p className="font-medium">Rustle…</p>
               <p>
                 {topic
-                  ? `I noticed that one about ${topic} was tricky.`
-                  : 'I noticed you got that one wrong.'}
+                  ? `You struggled with ${topic}. Something in the bushes noticed.`
+                  : 'You missed that one. Something in the bushes noticed.'}
               </p>
-              <p className="text-[var(--muted-foreground)]">Don't worry. That's what I'm here for.</p>
+              <p className="text-[var(--muted-foreground)]">
+                Want to see what was hiding?
+              </p>
             </div>
             <Button className="w-full min-h-12" onClick={() => setStep('hungry')}>
-              Meet your companion
+              Look closer
             </Button>
             <button type="button" className="text-xs text-[var(--muted-foreground)]" onClick={close}>
               Not now
@@ -102,7 +126,7 @@ export function DiscoveryModal() {
             <div className="flex justify-center">
               <PetAvatar species="fox" mood="sleepy" size="hero" hungry />
             </div>
-            <h2 className="font-semibold text-lg">Your companion is hungry</h2>
+            <h2 className="font-semibold text-lg">A companion is hungry</h2>
             <p className="text-sm text-[var(--muted-foreground)] leading-relaxed">
               Before it can chat, teach, or review with you, it needs food. In FutureLPT, food is a free
               Gemini API key — your companion runs on your key, not ours.
