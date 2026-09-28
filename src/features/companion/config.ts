@@ -10,12 +10,15 @@ export const COMPANION_ENERGY = {
 } as const;
 
 /**
- * Prefer FET’s flash-lite; fall back if that model is overloaded / unavailable.
- * Order: capacity-friendly → GA flash → newest flash.
+ * Free-tier reliability order:
+ * 1. gemini-2.5-flash-lite — mature, high free RPD, least capacity drama
+ * 2. gemini-2.5-flash — still very reliable on free tier
+ * 3. gemini-3.5-flash-lite — same as FET; use when 2.5 is fine
+ * Avoid 3.8 for free BYOK — heavier load / more “high demand” spikes.
  */
 export const GEMINI_CONFIG = {
-  MODEL: 'gemini-3.5-flash-lite',
-  FALLBACK_MODELS: ['gemini-3.5-flash', 'gemini-3.8-flash', 'gemini-2.5-flash-lite'] as const,
+  MODEL: 'gemini-2.5-flash-lite',
+  FALLBACK_MODELS: ['gemini-2.5-flash', 'gemini-3.5-flash-lite'] as const,
   MAX_OUTPUT_TOKENS: 1024,
   TEMPERATURE: 0.7,
 } as const;
