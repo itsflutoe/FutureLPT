@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import type { ExamAttempt, UserTopicStat } from '@/types';
 import { DAILY_CHALLENGE_COUNT } from '@/types';
+import { DashboardPet } from '@/features/companion/components/DashboardPet';
 
 export default function Dashboard() {
   const { user, profile } = useAuth();
@@ -88,7 +89,9 @@ export default function Dashboard() {
     .slice(0, 4);
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-6 sm:py-8 space-y-6">
+    <div className="mx-auto max-w-5xl px-4 py-6 sm:py-8 space-y-6 relative">
+      <DashboardPet />
+
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h1 className="text-xl sm:text-2xl font-bold tracking-tight truncate">

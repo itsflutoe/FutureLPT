@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/Button';
 import { Spinner } from '@/components/ui/Spinner';
 import { Badge } from '@/components/ui/Badge';
 import { Flag, ChevronLeft, ChevronRight, Bookmark, Check, X } from 'lucide-react';
+import { DiscoveryPaw } from '@/features/companion/components/DiscoveryPaw';
 
 export default function Exam() {
   const { attemptId } = useParams<{ attemptId: string }>();
@@ -96,7 +97,6 @@ export default function Exam() {
   const handleSelect = async (opt: 'A' | 'B' | 'C' | 'D') => {
     if (!q || !attemptId || (showFeedback && isPractice)) return;
     setSelected(opt);
-    // Optimistic UI — show feedback immediately in practice
     setAnswers((prev) => ({
       ...prev,
       [q.id]: {
@@ -107,7 +107,6 @@ export default function Exam() {
       },
     }));
     if (isPractice) setShowFeedback(true);
-    // Persist with known correct answer (skips extra SELECT)
     void saveAnswer(attemptId, q.id, opt, flagged.has(q.id), q.correct_answer).catch(console.error);
   };
 
@@ -151,7 +150,6 @@ export default function Exam() {
       setSubmitting(true);
       try {
         const timeUsed = Math.floor((Date.now() - startTime.current) / 1000);
-        // Scores attempt quickly; stats/streaks run in background
         await completeAttempt(attemptId, user.id, timeUsed);
         sessionStorage.removeItem(`exam_${attemptId}`);
         navigate(`/results/${attemptId}`);
@@ -187,6 +185,8 @@ export default function Exam() {
     { key: 'C', text: q.option_c },
     { key: 'D', text: q.option_d },
   ];
+
+  const isIncorrect = selected !== null && selected !== q.correct_answer;
 
   return (
     <div className="mx-auto max-w-3xl min-h-screen flex flex-col bg-[var(--background)]">
@@ -309,6 +309,19 @@ export default function Exam() {
             {q.reference && (
               <p className="text-xs text-[var(--muted-foreground)] mt-2">Reference: {q.reference}</p>
             )}
+            <DiscoveryPaw
+              isIncorrect={isIncorrect}
+              studyContext={{
+                mode: 'review',
+                topic: q.topic,
+                subject: q.subject,
+                category: q.category,
+                questionText: q.question,
+                userAnswer: selected || undefined,
+                correctAnswer: q.correct_answer,
+                explanation: q.explanation,
+              }}
+            />
             {current < questions.length - 1 ? (
               <Button className="w-full mt-4 min-h-12" onClick={goNext}>
                 Next question

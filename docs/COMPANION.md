@@ -1,21 +1,35 @@
-# FLPT Companion (feature branch)
+# FLPT Companion (feature/companion)
 
-This branch is reserved for the AI Companion Easter-egg integration.
+## Enable on Vercel preview
 
-## Status
+Add environment variable on the **Preview** environment:
 
-Scaffold only. Full Companion implementation lands on this branch.
-
-## Feature flag
-
-```bash
+```
 VITE_COMPANION_ENABLED=true
 ```
 
-When disabled (default), FutureLPT behaves exactly like production without Companion UI.
+Redeploy the `feature/companion` branch after setting it.
 
-## Product hierarchy
+## Supabase
 
-FutureLPT (reviewer) → Practice / Progress → Companion (Easter egg) → Pet personality → AI helper
+Run in SQL Editor:
 
-See integration spec discussed with product owner. Do not merge to `main` until Companion is complete and tested.
+`supabase/migrations/010_companion.sql`
+
+Creates:
+- `companion_profiles` (unlock, pet, energy, memories, gemini_api_key, hidden flag)
+- `companion_messages`
+- RLS: user owns own rows only
+
+## Product rules
+
+- Hidden until first practice **wrong** answer after feature is live
+- 🐾 on every wrong until unlocked; gone after unlock
+- Dashboard pet (bottom-right), not on exam screens
+- No main nav item; `/companion` via pet popup
+- FLPT is source of truth; selective context only
+- BYOK Gemini; energy is UX only
+
+## Hierarchy
+
+Reviewer first → Companion Easter egg → Pet personality → AI helper
