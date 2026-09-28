@@ -11,7 +11,8 @@ export function petErrorMessage(
     case 'RATE_LIMIT':
       return `${name} is a little overwhelmed right now… try again in a moment. 💤`;
     case 'MODEL':
-      return `${name} couldn’t quite catch that thought. Give it another try?`;
+    case 'EMPTY':
+      return `${name} drifted off for a second… ask one more time?`;
     case 'INVALID_KEY':
     case 'PERMISSION':
     case 'MISSING_KEY':
@@ -20,8 +21,6 @@ export function petErrorMessage(
       return `${name} is too sleepy to study right now. 💤`;
     case 'NETWORK':
       return `${name} lost the thread for a second. Check your connection and try again.`;
-    case 'EMPTY':
-      return `${name} went quiet… ask again?`;
     default:
       return `${name} isn’t in the mood to answer right now. Try again in a bit.`;
   }
@@ -41,13 +40,13 @@ function classifyError(msg: string, name?: string): { type: string; message: str
     return { type: 'PERMISSION', message: petErrorMessage('PERMISSION', n) };
   if (/network|fetch|Failed to fetch/i.test(msg))
     return { type: 'NETWORK', message: petErrorMessage('NETWORK', n) };
-  if (/empty/i.test(msg))
+  if (/empty|blocked|SAFETY|finishReason/i.test(msg))
     return { type: 'EMPTY', message: petErrorMessage('EMPTY', n) };
   return { type: 'UNKNOWN', message: petErrorMessage('UNKNOWN', n) };
 }
 
 function isRetryableModelError(msg: string): boolean {
-  return /high demand|experiencing high|try again later|overloaded|capacity|no longer available|not found|is not supported|NOT_FOUND|RESOURCE_EXHAUSTED|429|unavailable/i.test(
+  return /high demand|experiencing high|try again later|overloaded|capacity|no longer available|not found|is not supported|NOT_FOUND|RESOURCE_EXHAUSTED|429|unavailable|empty|blocked|SAFETY|finishReason/i.test(
     msg
   );
 }
@@ -128,10 +127,17 @@ async function callModel(
     return { ok: false, message: String(msg) };
   }
 
+  const candidate = data?.candidates?.[0];
+  const finish = candidate?.finishReason || '';
   const text =
-    data?.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p.text || '').join('') ||
-    '';
-  if (!text.trim()) return { ok: false, message: 'Empty reply from Gemini.' };
+    candidate?.content?.parts?.map((p: { text?: string }) => p.text || '').join('') || '';
+
+  if (!text.trim()) {
+    return {
+      ok: false,
+      message: finish ? `Empty reply finishReason=${finish}` : 'Empty reply from Gemini.',
+    };
+  }
   return { ok: true, text: text.trim() };
 }
 
@@ -147,7 +153,6 @@ export async function generateCompanionReply(opts: {
   const petName = profile.name || 'Your companion';
   const system = buildSystemPrompt(profile, contextType, studyContext, recentMessages);
 
-  // Primary: free-tier lite; fallbacks only if overloaded / unavailable
   const models = [GEMINI_CONFIG.MODEL, ...GEMINI_CONFIG.FALLBACK_MODELS];
   let lastMsg = '';
 
