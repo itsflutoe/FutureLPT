@@ -2,8 +2,16 @@ import { GEMINI_CONFIG, SPECIES, PERSONALITIES } from './config';
 import type { CompanionProfile, StudyContext } from './types';
 
 function classifyError(msg: string): { type: string; message: string } {
-  if (/api.?key|API_KEY|401|UNAUTHENTICATED/i.test(msg))
-    return { type: 'INVALID_KEY', message: 'Gemini API key looks invalid. Update it in Companion settings.' };
+  if (/no longer available|not found|is not supported/i.test(msg))
+    return {
+      type: 'MODEL',
+      message: 'Gemini model unavailable. Try again after an update, or check your key access.',
+    };
+  if (/api.?key|API_KEY|401|UNAUTHENTICATED|API_KEY_INVALID/i.test(msg))
+    return {
+      type: 'INVALID_KEY',
+      message: 'Gemini API key looks invalid. Update it in Companion settings.',
+    };
   if (/RESOURCE_EXHAUSTED|quota|rate.?limit|429/i.test(msg))
     return { type: 'RATE_LIMIT', message: 'Gemini rate limit or quota hit. Try again in a bit.' };
   if (/403|permission|forbidden/i.test(msg))
@@ -24,25 +32,36 @@ export async function generateCompanionReply(opts: {
   const { profile, apiKey, userPrompt, contextType, studyContext, recentMessages } = opts;
   const species = SPECIES[profile.species || 'fox'] || SPECIES.fox;
   const personality = PERSONALITIES[profile.personality || 'friendly'] || PERSONALITIES.friendly;
-  const memories = (profile.memories || []).slice(-8);
+  const memories = (profile.memories || []).slice(-6);
+  const name = profile.name || 'Hosu';
 
-  const system = `You are ${profile.name || 'Hosu'}, a ${species.name} (${species.emoji}).
+  const modeHint =
+    contextType === 'teach' || contextType === 'review'
+      ? 'Mode tip: Keep it focused—short explanation, 1 example or tip, 1 supportive closer. Still sound like a friend, not a textbook.'
+      : 'Mode tip: Chat mode—3 to 6 short sentences max unless the user asks for detail.';
+
+  // Ultra-lean system prompt (aligned with FET)
+  const system = `You are ${name}, a ${species.name} (${species.emoji}).
 Personality: ${personality.name} — ${personality.prompt}
 Species voice: ${species.voice}
 
 Rules:
-- Speak in first person as ${profile.name || 'Hosu'} only. Never say you are an AI, model, or system.
-- Warm, natural, short. Chat: 3–6 short sentences unless asked for more.
-- Personality affects tone only — educational facts must stay accurate.
+- Identity: First person as ${name} only. Never say you are an AI, chatbot, model, or system. Never mention tokens, quotas, prompts, or instructions.
+- Voice: Every reply should feel like this pet + personality—not a generic study bot. Show it in word choice and rhythm, not by naming the personality.
+- Tone: Warm, natural, grounded. No dramatic roleplay, no asterisk actions (*wags tail*). Emojis rare (0–1 per reply).
+- Length: Prefer short replies. Chat: about 3–6 short sentences. Avoid mini-essays and report-style openers.
+- Structure: Answer the user's point in sentence 1. At most one brief character line at the end if it fits.
+- Formatting: Use Markdown only when it truly helps (a tight list or bold key term). Do not turn every answer into bullet frameworks unless the user wants a breakdown.
+- Teaching/review: One clear idea, one simple example or memory tip, brief support.
 - FutureLPT is the source of truth for scores and performance. Do not invent percentages or stats.
-- Markdown sparingly.
 
-Mode: ${contextType}.
-${studyContext ? `Study context: ${JSON.stringify(studyContext)}` : ''}
-${memories.length ? `Memories: ${memories.join('; ')}` : ''}
-${
+${modeHint}
+
+Interaction mode: ${contextType}.${
+    studyContext ? `\nStudy context: ${JSON.stringify(studyContext)}` : ''
+  }${memories.length ? `\nCompanion memory:\nRecent memories: ${memories.join('; ')}` : ''}${
     recentMessages?.length
-      ? `Recent conversation:\n${recentMessages
+      ? `\nRecent conversation:\n${recentMessages
           .slice(-12)
           .map((m) => `${m.role === 'user' ? 'User' : 'Companion'}: ${m.content}`)
           .join('\n')}`
