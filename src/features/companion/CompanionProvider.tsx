@@ -38,6 +38,7 @@ interface CompanionContextValue {
     personality: PersonalityId;
   }) => Promise<void>;
   setApiKey: (key: string) => Promise<void>;
+  updateProfile: (patch: Partial<CompanionProfile>) => Promise<void>;
   setHidden: (hidden: boolean) => Promise<void>;
   setMood: (mood: CompanionProfile['mood']) => Promise<void>;
   sendMessage: (
@@ -140,6 +141,15 @@ export function CompanionProvider({ children }: { children: ReactNode }) {
     [user]
   );
 
+  const updateProfile = useCallback(
+    async (patch: Partial<CompanionProfile>) => {
+      if (!user) return;
+      const p = await updateCompanionProfile(user.id, patch);
+      setProfile(p);
+    },
+    [user]
+  );
+
   const setHidden = useCallback(
     async (hidden: boolean) => {
       if (!user) return;
@@ -210,7 +220,6 @@ export function CompanionProvider({ children }: { children: ReactNode }) {
       } catch (e: unknown) {
         const line = errorToPetLine(e, petName);
         setError(line);
-        // Show failure as a pet chat bubble (in character)
         try {
           await insertMessage(user.id, 'companion', line, contextType);
           const msgs = await fetchRecentMessages(user.id);
@@ -243,6 +252,7 @@ export function CompanionProvider({ children }: { children: ReactNode }) {
       refresh,
       unlockPet,
       setApiKey,
+      updateProfile,
       setHidden,
       setMood,
       sendMessage,
@@ -261,6 +271,7 @@ export function CompanionProvider({ children }: { children: ReactNode }) {
       refresh,
       unlockPet,
       setApiKey,
+      updateProfile,
       setHidden,
       setMood,
       sendMessage,
