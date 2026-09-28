@@ -1,0 +1,147 @@
+/* Companion pet — FET-inspired motion (scoped) */
+
+.companion-pet-avatar {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+  line-height: 1;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 50% 50%,
+    color-mix(in srgb, var(--accent-color) 18%, transparent) 0%,
+    color-mix(in srgb, var(--accent-color) 6%, transparent) 45%,
+    transparent 70%
+  );
+}
+
+.companion-pet-emoji {
+  display: block;
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.2));
+}
+
+.companion-pet-sm {
+  width: 2.75rem;
+  height: 2.75rem;
+  font-size: 1.4rem;
+}
+.companion-pet-md {
+  width: 4rem;
+  height: 4rem;
+  font-size: 2.1rem;
+}
+.companion-pet-lg {
+  width: 5.5rem;
+  height: 5.5rem;
+  font-size: 2.9rem;
+}
+.companion-pet-xl {
+  width: 7rem;
+  height: 7rem;
+  font-size: 3.6rem;
+}
+.companion-pet-hero {
+  width: min(28vw, 6.5rem);
+  height: min(28vw, 6.5rem);
+  font-size: min(15vw, 3.5rem);
+}
+
+@media (min-width: 640px) {
+  .companion-pet-hero {
+    width: 7.25rem;
+    height: 7.25rem;
+    font-size: 3.9rem;
+  }
+}
+
+.companion-pet-idle {
+  animation: companion-float 3.2s ease-in-out infinite;
+}
+.companion-pet-thinking {
+  animation: companion-think 1.1s ease-in-out infinite;
+}
+.companion-pet-excited {
+  animation: companion-bounce 0.7s ease-in-out infinite;
+}
+.companion-pet-sleepy {
+  opacity: 0.82;
+  filter: saturate(0.75);
+  animation: companion-float 4.5s ease-in-out infinite;
+}
+.companion-pet-mad {
+  animation: companion-mad 0.45s ease-in-out 2;
+}
+.companion-pet-avatar.is-hungry {
+  opacity: 0.9;
+  filter: grayscale(0.35) saturate(0.7);
+}
+
+.companion-mood-bubble {
+  position: absolute;
+  top: -4px;
+  right: -6px;
+  font-size: 1rem;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.25));
+  animation: companion-bubble 0.35s ease-out;
+}
+
+@keyframes companion-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+@keyframes companion-think {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    transform: translateY(-4px) scale(1.02);
+  }
+}
+@keyframes companion-bounce {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+@keyframes companion-mad {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-3px) rotate(-2deg);
+  }
+  75% {
+    transform: translateX(3px) rotate(2deg);
+  }
+}
+@keyframes companion-bubble {
+  from {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .companion-pet-idle,
+  .companion-pet-thinking,
+  .companion-pet-excited,
+  .companion-pet-sleepy,
+  .companion-pet-mad {
+    animation: none;
+  }
+}
