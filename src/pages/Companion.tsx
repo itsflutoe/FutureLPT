@@ -17,6 +17,8 @@ import { Input } from '@/components/ui/Input';
 import { Spinner } from '@/components/ui/Spinner';
 import type { StudyContext } from '@/features/companion/types';
 
+type CompanionMode = 'chat' | 'teach' | 'review' | 'settings';
+
 export default function CompanionPage() {
   const enabled = isCompanionEnabled();
   const { user } = useAuth();
@@ -31,8 +33,8 @@ export default function CompanionPage() {
     setHidden,
   } = useCompanion();
   const [params] = useSearchParams();
-  const modeParam = (params.get('mode') as 'chat' | 'teach' | 'review') || 'chat';
-  const [mode, setMode] = useState<'chat' | 'teach' | 'review' | 'settings'>(modeParam);
+  const modeParam = params.get('mode');
+  const [mode, setMode] = useState<CompanionMode>('chat');
   const [input, setInput] = useState('');
   const [apiKeyDraft, setApiKeyDraft] = useState('');
   const [nameDraft, setNameDraft] = useState('');
@@ -57,8 +59,9 @@ export default function CompanionPage() {
   const messagesBoxRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (modeParam === 'settings') setMode('settings');
-    else if (['chat', 'teach', 'review'].includes(modeParam)) setMode(modeParam);
+    if (modeParam === 'settings' || modeParam === 'chat' || modeParam === 'teach' || modeParam === 'review') {
+      setMode(modeParam);
+    }
   }, [modeParam]);
 
   useEffect(() => {
@@ -121,13 +124,14 @@ export default function CompanionPage() {
   const onSend = async () => {
     const text = input.trim();
     if (!text || loading || energyLow || mode === 'settings') return;
+    const contextType: 'chat' | 'teach' | 'review' = mode;
     setInput('');
     let study: StudyContext | null = null;
-    if (mode === 'teach') {
+    if (contextType === 'teach') {
       const topic = freeTopic.trim() || selectedTopic;
       study = { mode: 'teach', topic };
     }
-    if (mode === 'review') {
+    if (contextType === 'review') {
       const m = mistakes[0];
       study = {
         mode: 'review',
@@ -139,7 +143,7 @@ export default function CompanionPage() {
       };
     }
     try {
-      await sendMessage(text, mode, study);
+      await sendMessage(text, contextType, study);
     } catch {
       /* pet line already in messages */
     }
