@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useCompanion } from '../CompanionProvider';
-import { SPECIES, PERSONALITIES, MOOD_EMOJI, COMPANION_ENERGY } from '../config';
+import { SPECIES, PERSONALITIES, COMPANION_ENERGY } from '../config';
+import { PetAvatar } from './PetAvatar';
 import { Button } from '@/components/ui/Button';
 
 export function DashboardPet() {
@@ -12,22 +13,26 @@ export function DashboardPet() {
   if (!profile.species || !profile.name) return null;
 
   const species = SPECIES[profile.species] || SPECIES.fox;
-  const mood = MOOD_EMOJI[profile.mood] || '👀';
-  const energyPct = Math.round((profile.energy / (profile.max_energy || COMPANION_ENERGY.MAX)) * 100);
+  const energyPct = Math.round(
+    (profile.energy / (profile.max_energy || COMPANION_ENERGY.MAX)) * 100
+  );
+  const mood = profile.mood || 'happy';
 
   return (
     <div className="fixed z-30 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] right-3 lg:bottom-6 lg:right-6 flex flex-col items-end gap-2 pointer-events-none">
       {open && (
         <div className="pointer-events-auto w-[min(18rem,calc(100vw-1.5rem))] rounded-2xl border border-[var(--border)] bg-[var(--card)] shadow-lg p-4 space-y-3">
           <div className="flex items-start justify-between gap-2">
-            <div>
-              <div className="text-2xl leading-none">{species.emoji}</div>
-              <div className="font-semibold text-sm mt-1">{profile.name}</div>
-              <p className="text-xs text-[var(--muted-foreground)] mt-0.5">Ready to study?</p>
+            <div className="flex items-center gap-2">
+              <PetAvatar species={profile.species} mood={mood} size="md" />
+              <div>
+                <div className="font-semibold text-sm">{profile.name}</div>
+                <p className="text-xs text-[var(--muted-foreground)] mt-0.5">Ready to study?</p>
+              </div>
             </div>
             <button
               type="button"
-              className="text-xs text-[var(--muted-foreground)]"
+              className="text-xs text-[var(--muted-foreground)] min-h-9 px-1"
               onClick={() => setOpen(false)}
             >
               Close
@@ -37,7 +42,7 @@ export function DashboardPet() {
             ⚡ Energy {profile.energy}/{profile.max_energy}
             <div className="h-1.5 rounded-full bg-[var(--muted)] mt-1 overflow-hidden">
               <div
-                className="h-full bg-[var(--accent-color)] rounded-full"
+                className="h-full bg-[var(--accent-color)] rounded-full transition-all"
                 style={{ width: `${energyPct}%` }}
               />
             </div>
@@ -68,7 +73,7 @@ export function DashboardPet() {
           </Link>
           <button
             type="button"
-            className="block w-full text-center text-[10px] text-[var(--muted-foreground)]"
+            className="block w-full text-center text-[10px] text-[var(--muted-foreground)] min-h-9"
             onClick={() => {
               void setHidden(true);
               setOpen(false);
@@ -77,7 +82,7 @@ export function DashboardPet() {
             Hide for now
           </button>
           <p className="text-[10px] text-center text-[var(--muted-foreground)]">
-            {PERSONALITIES[profile.personality || 'friendly']?.name}
+            {PERSONALITIES[profile.personality || 'friendly']?.name} · {species.name}
           </p>
         </div>
       )}
@@ -85,16 +90,11 @@ export function DashboardPet() {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="pointer-events-auto flex flex-col items-center rounded-2xl border border-[var(--border)] bg-[var(--card)]/95 backdrop-blur px-3 py-2 shadow-md hover:shadow-lg transition-shadow"
+        className="pointer-events-auto flex flex-col items-center rounded-2xl border border-[var(--border)] bg-[var(--card)]/95 backdrop-blur px-2.5 py-2 shadow-md hover:shadow-lg transition-shadow"
         aria-label={`${profile.name} companion`}
       >
-        <span className="text-sm leading-none mb-0.5" aria-hidden>
-          💭 {mood}
-        </span>
-        <span className="text-3xl leading-none" aria-hidden>
-          {species.emoji}
-        </span>
-        <span className="text-[10px] font-medium mt-0.5 text-[var(--muted-foreground)]">
+        <PetAvatar species={profile.species} mood={mood} size="md" />
+        <span className="text-[10px] font-medium mt-0.5 text-[var(--muted-foreground)] max-w-[4.5rem] truncate">
           {profile.name}
         </span>
       </button>
