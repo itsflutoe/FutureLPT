@@ -5,7 +5,7 @@ import { parse } from "csv-parse/sync";
 export default function handler(req, res) {
   try {
     // Path to your CSV file
-    const csvPath = path.join(process.cwd(), "data", "flpt.csv"); // ← change this if needed
+    const csvPath = path.join(process.cwd(), "api", "flpt.csv"); // ← change this if needed
     const fileContent = fs.readFileSync(csvPath, "utf8");
 
     const records = parse(fileContent, {
